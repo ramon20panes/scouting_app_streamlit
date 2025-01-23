@@ -169,3 +169,30 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Datos y bases de datos
+data/*.csv
+data/*.xlsx
+*.db
+*.sqlite
+
+# Logs y archivos temporales
+logs/
+temp/
+*.tmp
+
+# Archivos de configuración local
+config.local.py
+settings.local.py
