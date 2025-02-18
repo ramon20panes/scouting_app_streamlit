@@ -13,10 +13,9 @@ La aplicación permite realizar un seguimiento completo del rendimiento del equi
  Estudio profundo de cada partido con comparativas entre equipos, visualización de eventos clave, mapas de calor y patrones de juego.
 
 - **Perfiles de Jugadores**: 
- Análisis individual que incluye estadísticas detalladas, zonas de influencia y métricas específicas de rendimiento por posición.
 
 - **Herramienta de Scouting**: 
- Sistema avanzado de comparación que facilita la identificación de talentos similares para potenciales fichajes.
+Posibles dos nuevas páginas en un futuro.
 
 ## Tecnologías
 - Python + Streamlit
@@ -33,3 +32,12 @@ La aplicación permite realizar un seguimiento completo del rendimiento del equi
 
 ## Licencia
 MIT License
+
+
+## Agradecimientos
+[Adnaaan433](https://github.com/adnaaan433/Post-Match-Report-2.0)
+[Federico Rabanos](https://github.com/federicorabanos)
+[Ben Griffish](https://github.com/griffisben/Soccer-Analyses)
+[Mckay Johns](https://www.youtube.com/@McKayJohns)
+[Oseymour](https://github.com/oseymour/ScraperFC)
+[José González](https://www.kaggle.com/code/josegabrielgonzalez/understat-series-xg-rolling-averages)
