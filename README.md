@@ -35,9 +35,17 @@ MIT License
 
 
 ## Agradecimientos
+
+[Lucas Bracamonte](https://github.com/lucbra21?tab=repositories)
+
 [Adnaaan433](https://github.com/adnaaan433/Post-Match-Report-2.0)
+
 [Federico Rabanos](https://github.com/federicorabanos)
+
 [Ben Griffish](https://github.com/griffisben/Soccer-Analyses)
+
 [Mckay Johns](https://www.youtube.com/@McKayJohns)
+
 [Oseymour](https://github.com/oseymour/ScraperFC)
+
 [José González](https://www.kaggle.com/code/josegabrielgonzalez/understat-series-xg-rolling-averages)
