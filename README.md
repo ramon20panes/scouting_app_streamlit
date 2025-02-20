@@ -12,9 +12,7 @@ La aplicación permite realizar un seguimiento completo del rendimiento del equi
 - **Análisis de Jornada**: 
  Estudio profundo de cada partido con comparativas entre equipos, visualización de eventos clave, mapas de calor y patrones de juego.
 
-- **Perfiles de Jugadores**: 
-
-- **Herramienta de Scouting**: 
+- **Perfiles de Jugadores**/**Herramienta de Scouting**: 
 Posibles dos nuevas páginas en un futuro.
 
 ## Tecnologías
