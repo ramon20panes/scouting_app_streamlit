@@ -1,10 +1,13 @@
-[theme]
+[
+theme
+]
 primaryColor = "#001F3F"  # Azul oscuro para elementos principales
 backgroundColor = "#E6E6E6"  # Gris mediano para el fondo principal
-secondaryBackgroundColor = "#D3D3D3"  # Gris un poco más claro para elementos secundarios
+secondaryBackgroundColor = "#D3D3D3"  # Gris claro para elementos secundarios
 textColor = "#001F3F"  # Azul oscuro para textos
-font = "sans serif"
-
-[server]
+font = "sans serif"  # Fuente de respaldo
+[
+server
+]
 enableCORS = false
 enableXsrfProtection = false
