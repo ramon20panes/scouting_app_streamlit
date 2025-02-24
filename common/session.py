@@ -17,3 +17,8 @@ def init_session_state():
         
     if "selected_metrics" not in st.session_state:
         st.session_state.selected_metrics = []
+
+    if "page_history" not in st.session_state:
+        st.session_state.page_history = []
+
+    

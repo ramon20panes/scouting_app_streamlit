@@ -8,8 +8,18 @@ import base64
 st.set_page_config(
     page_title="Atlético de Madrid 24/25",
     page_icon="⚽",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
+
+# Ocultar menú de hamburguesa y demás elementos
+hide_menu = """
+<style>
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_menu, unsafe_allow_html=True)
 
 # Rutas de las imágenes
 ESCUDO_PATH = Path("assets/escudos/atm.png")
@@ -22,7 +32,28 @@ def base64_image(image_path):
 
 def load_css():
     """Carga todos los estilos CSS de la aplicación"""
+
+    
     st.markdown("""
+        <style>
+        /* Control inmediato de sidebar y navegación - Poner al inicio */
+        [data-testid="stSidebar"][aria-expanded="false"],
+        [data-testid="stSidebar"][aria-expanded="true"],
+        div[data-testid="collapsedControl"],
+        section[data-testid="stSidebarNav"],
+        button[kind="menuButton"],
+        .stDeployButton,
+        div[class^="stToolbar"] {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            position: absolute !important;
+            z-index: -1 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }        
+        
         <style>
         /* Importar fuente similar a Rockwell (Google Fonts no tiene Rockwell) */
         @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&display=swap');
@@ -103,15 +134,10 @@ def load_css():
             max-width: 200px !important;
         }
         
-        /* Capitalización del sidebar */
-        nav[data-testid="stSidebar"] ul li a p {
-            text-transform: capitalize !important;
-        }
         /* Color global de texto */
         .st-emotion-cache-*, div, p, h1, h2, h3, label {
             color: #001F3F !important;
-        }
-        
+        }        
         /* Ajustes responsivos mejorados */
         @media (max-width: 1200px) {
             .main-title { font-size: 2.2em; }
@@ -156,7 +182,33 @@ def main():
     """, unsafe_allow_html=True)
 
     # Login y navegación
+    # Código más específico y agresivo para ocultar la sidebar y el botón
     if not check_auth():
+        st.markdown("""
+            <style>
+            /* Ocultar sidebar y sus elementos */
+            [data-testid="stSidebar"] {
+                display: none !important;
+            }
+            div[data-testid="collapsedControl"] {
+                display: none !important;
+            }
+            .css-1d391kg {
+                display: none !important;
+            }
+            section[data-testid="stSidebarNav"] {
+                display: none !important;
+            }
+            /* Ocultar botón de recarga y otros controles */
+            .stApp > header {
+                display: none !important;
+            }
+            .stDeployButton {
+                display: none !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
             login()  # Todo el manejo lo hace la función login
@@ -176,3 +228,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
