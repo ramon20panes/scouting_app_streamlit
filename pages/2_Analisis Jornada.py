@@ -1,5 +1,7 @@
 import streamlit as st
 from utils.auth import check_auth, logout
+from common.pdf_export import export_to_pdf
+from pathlib import Path
 
 # Configuración de la página
 st.set_page_config(
@@ -10,14 +12,22 @@ st.set_page_config(
 
 # Verificar autenticación
 if not check_auth():
-    st.switch_page("app_dd.py")
+    st.switch_page("Aplic_Direcc_Deport.py")
 
 # Título centrado
-st.markdown("""
-    <h1 style='text-align: center; padding: 1.5rem 0; color: #001F3F;'>
-        Resumen Jornada
-    </h1>
-""", unsafe_allow_html=True)
+ESCUDO_PATH = Path("assets/escudos/atm.png")
+
+# Título con escudo
+col_title, col_logo = st.columns([1, 1])
+
+with col_title:
+    st.markdown("""
+        <h2 style='text-align: right; margin-top: -10px;'>
+            Información Jornada
+    """, unsafe_allow_html=True)
+
+with col_logo:
+    st.image(ESCUDO_PATH, width=50)
 
 # Obtener el nombre de la página actual
 current_page = __file__.split('\\')[-1]
