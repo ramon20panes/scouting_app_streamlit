@@ -5,15 +5,11 @@ from pathlib import Path
 
 # Obtener la ruta absoluta a la base de datos
 DB_PATH = Path(__file__).parent.parent / "data/FData/stats/stats_big5_24_25.db"
-print(f"Ruta a la base de datos: {DB_PATH.absolute()}")
-print(f"¿Existe la base de datos?: {os.path.exists(DB_PATH)}")
 
 def get_connection():
     """Establece conexión con la base de datos SQLite."""
-    try:
-        print(f"Intentando conectar a: {DB_PATH}")
+    try:        
         conn = sqlite3.connect(DB_PATH)
-        print("Conexión establecida correctamente")
         return conn
     except Exception as e:
         print(f"Error al conectar con la base de datos: {e}")

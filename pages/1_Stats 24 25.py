@@ -49,10 +49,7 @@ if player_data.empty:
 else:
     # Categorizar métricas
     categorized_metrics = categorize_metrics(player_data.columns)
-    # SECCIÓN 1: Tabla de jugadores y filtros
-    # Contenedor para tabla y filtros
     
-    # Fila para filtros y controles
     filter_col1, filter_col2 = st.columns([3, 1])
     
     with filter_col1:
