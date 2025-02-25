@@ -18,7 +18,7 @@ if not check_auth():
 ESCUDO_PATH = Path("assets/escudos/atm.png")
 
 # Título con escudo
-col_title, col_logo, col3 = st.columns([1, 1, 1])
+col_title, col_logo = st.columns([1, 1])
 
 with col_title:
     st.markdown("""
@@ -28,12 +28,6 @@ with col_title:
 
 with col_logo:
     st.image(ESCUDO_PATH, width=50)
-
-# Botón exportar PDF (abajo)
-with col3:
-    st.markdown("<div style='text-align: right, margin-top: 2rem;'></div>", unsafe_allow_html=True)
-    if st.button("PDF"):
-        st.info("Generando PDF... Funcionalidad en desarrollo")
 
 # Obtener el nombre de la página actual
 current_page = __file__.split('\\')[-1]

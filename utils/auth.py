@@ -52,7 +52,7 @@ def logout():
             del st.session_state[key]
     
     # Redireccionar a la página principal
-    st.switch_page("app_dd.py")
+    st.switch_page("Aplic_Direcc_Deport.py")
 
 def check_auth():
     """Verifica autenticación y timeout"""
