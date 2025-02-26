@@ -32,7 +32,23 @@ FOOTER_PATH = Path("assets/logos/footer.png")
 def base64_image(image_path):
     """Convierte imagen a base64 para insertarla en HTML"""
     with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode()      
+        return base64.b64encode(image_file.read()).decode()  
+
+# Ocultar la sidebar en la página principal
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"][aria-expanded="false"],
+    [data-testid="stSidebar"][aria-expanded="true"],
+    div[data-testid="collapsedControl"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        position: absolute !important;
+        z-index: -1 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)    
        
 def main():
     # Inicializar estado de sesión

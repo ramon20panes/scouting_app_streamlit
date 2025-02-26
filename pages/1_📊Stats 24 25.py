@@ -5,7 +5,7 @@ import sqlite3
 import sys
 from pathlib import Path
 from utils.auth import check_auth, logout
-from common.database import get_players_atleti, categorize_metrics
+from data.database.database import get_players_atleti, categorize_metrics
 from common.pdf_export import export_to_pdf, download_pdf_button
 import base64
 from datetime import datetime
@@ -21,17 +21,32 @@ st.set_page_config(
 # Cargar estilos al principio del archivo
 load_all_styles()
 
-# Mostrar sidebar explícitamente - COLOCADO DESPUÉS DE LOAD_ALL_STYLES
+# Mostrar la sidebar explícitamente en las páginas interiores
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"][aria-expanded="false"],
+    [data-testid="stSidebar"][aria-expanded="true"],
+    div[data-testid="collapsedControl"] {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        position: relative !important;
+        z-index: 1 !important;
+        margin: 0px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Añadir reducción de márgenes y espaciados
 st.markdown("""
 <style>
-[data-testid="stSidebar"][aria-expanded="false"],
-[data-testid="stSidebar"][aria-expanded="true"],
-div[data-testid="collapsedControl"] {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative !important;
-    z-index: 1 !important;
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 0rem;
+}
+div[data-testid="stVerticalBlock"] > div {
+    margin-bottom: 0.3rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -40,23 +55,37 @@ div[data-testid="collapsedControl"] {
 if not check_auth():
     st.switch_page("Aplic_Direcc_Deport.py")
 
-# Cargar estilos al principio del archivo
-load_all_styles()
-
 ESCUDO_PATH = Path("assets/escudos/atm.png")
     
-# Título con escudo
-col_title, col_logo = st.columns([4, 1])
+# Título con escudo (modificado para ser más compacto)
+col_title, col_logo = st.columns([5, 1])
 
 with col_title:
+    st.write("")
     st.markdown("""
-        <h2 style='text-align: left; margin-top: -10px;'>
-            Métricas 24/25
+        <h2 style='text-align: left; margin-top: -15px; margin-bottom: -10px;'>
+            Métricas 24-25
         </h2>
     """, unsafe_allow_html=True)
 
 with col_logo:
-    st.image(ESCUDO_PATH, width=100)
+    st.write("")  # Esto añade un pequeño espacio vertical
+    st.image(ESCUDO_PATH, width=70)  # Reducir el tamaño del escudo
+
+# Reducir el espacio antes de los tabs
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    margin-bottom: -25px;
+}
+div[data-testid="stTabs"] {
+    margin-top: -20px;
+}
+div[data-testid="stTabContent"] {
+    padding-top: 0.5rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Cargar datos de jugadores del Atlético
 @st.cache_data(ttl=3600)
@@ -74,13 +103,26 @@ else:
     filter_col1, filter_col2 = st.columns([4, 1])
     
     with filter_col1:
-        # Selector de categorías para la tabla
+        # Inicializar valores por defecto si es la primera vez
+        if "selected_metrics" not in st.session_state:
+            st.session_state.selected_metrics = ["Ataque"]
+        # Asegurarse de que "Ataque" siempre esté incluido
+        elif "Ataque" not in st.session_state.selected_metrics:
+            st.session_state.selected_metrics = ["Ataque"] + st.session_state.selected_metrics
+
+        # Selector de categorías para la tabla con estado persistente
         metric_categories = st.multiselect(
             "Grupo métricas:",
             ["Ataque", "Pases", "Posesión", "Defensa", "Disciplina"],
-            default=["Ataque"]
-        )
-        
+            default=st.session_state.selected_metrics
+        )   
+
+        # Guardar la selección actual en session_state
+        # Si el usuario quitó todas las selecciones, volver a poner "Ataque"
+        if not metric_categories:
+            metric_categories = ["Ataque"]
+        st.session_state.selected_metrics = metric_categories
+    
         # Recopilar métricas de las categorías seleccionadas
         selected_table_metrics = []
         for category in metric_categories:
@@ -90,7 +132,7 @@ else:
         # Slider de minutos para la tabla
         max_minutes = int(player_data['Minutos'].max()) if not player_data.empty else 3000
         min_minutes, max_minutes_selected = st.slider(
-            "Minuto de juego",
+            "Rango minutos",
             min_value=0,
             max_value=max_minutes,
             value=(0, max_minutes)
@@ -113,7 +155,7 @@ else:
             subset=[m for m in selected_table_metrics if m in filtered_players.columns]
         ),
         use_container_width=True,
-        height=400
+        height=300
     )
     
     # SECCIÓN 2: Rankings con slider de minutos
@@ -149,7 +191,7 @@ else:
     with rank_control_cols[1]:
         # Slider de minutos para rankings
         rank_min, rank_max = st.slider(
-            "Mín Minutos",
+            "Rango minutos",
             min_value=0,
             max_value=max_minutes,
             value=(100, max_minutes)  # Por defecto filtramos jugadores con menos de 100 minutos
@@ -199,12 +241,7 @@ st.markdown("---")
 footer_container = st.container()
 
 with footer_container:
-    # Usa un espacio para crear más separación con el contenido anterior
-    st.write("")
-    st.write("")
-    st.write("")
-    st.write("")
-    
+        
     footer_cols = st.columns([1, 2, 1])
     
     # Columna izquierda - Botón PDF con texto incluido

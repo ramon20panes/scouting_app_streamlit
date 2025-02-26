@@ -6,8 +6,6 @@ from common.pdf_export import export_to_pdf, download_pdf_button
 import base64
 from datetime import datetime
 from pathlib import Path
-import plotly.express as px
-import plotly.graph_objects as go
 from utils.styles import load_all_styles
 
 # Configuración de la página
@@ -17,27 +15,75 @@ st.set_page_config(
     layout="wide"
 )
 
+# Cargar estilos al principio del archivo
+load_all_styles()
+
+# Mostrar la sidebar explícitamente
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"][aria-expanded="false"],
+    [data-testid="stSidebar"][aria-expanded="true"],
+    div[data-testid="collapsedControl"] {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        position: relative !important;
+        z-index: 1 !important;
+        margin: 0px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Añadir reducción de márgenes y espaciados
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 0rem;
+}
+div[data-testid="stVerticalBlock"] > div {
+    margin-bottom: 0.3rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Verificar autenticación
 if not check_auth():
     st.switch_page("Aplic_Direcc_Deport.py")
 
-# Cargar estilos al principio del archivo
-load_all_styles()
-
 # Título centrado
 ESCUDO_PATH = Path("assets/escudos/atm.png")
 
-# Título con escudo
-col_title, col_logo = st.columns([4, 1])
+# Título con escudo (modificado para ser más compacto)
+col_title, col_logo = st.columns([5, 1])
 
 with col_title:
+    st.write("")
     st.markdown("""
-        <h2 style='text-align: left; margin-top: -10px;'>
-            Visualizaciones 24-25
+        <h2 style='text-align: left; margin-top: -15px; margin-bottom: -10px;'>
+            Análisis Post_Partido
+        </h2>
     """, unsafe_allow_html=True)
 
 with col_logo:
-    st.image(ESCUDO_PATH, width=100)
+    st.write("")  # Esto añade un pequeño espacio vertical
+    st.image(ESCUDO_PATH, width=70)  # Reducir el tamaño del escudo
+
+# Reducir el espacio antes de los tabs
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    margin-bottom: -25px;
+}
+div[data-testid="stTabs"] {
+    margin-top: -20px;
+}
+div[data-testid="stTabContent"] {
+    padding-top: 0.5rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Obtener el nombre de la página actual
 current_page = __file__.split('\\')[-1]
@@ -50,83 +96,23 @@ if "page_history" not in st.session_state:
 if not st.session_state.page_history or st.session_state.page_history[-1] != current_page:
     st.session_state.page_history.append(current_page)
 
-# SECCIÓN 3: Área de visualizaciones
-        
-# Tres columnas para las visualizaciones
-viz_col1, viz_col2, viz_col3 = st.columns(3)
-    
-with viz_col1:
-    st.markdown("<h4 style='text-align: center;'>Clasificación LaLiga</h4>", unsafe_allow_html=True)
-    st.info("Gráfico de clasificación con liga_positions_24_25.csv")
-    
-with viz_col2:
-    st.markdown("<h4 style='text-align: center;'>Timeline LaLiga 24/25</h4>", unsafe_allow_html=True)
-    st.info("Timeline con datos de la API")
-    
-with viz_col3:
-    st.markdown("<h4 style='text-align: center;'>Expected Goals (xG)</h4>", unsafe_allow_html=True)
-    st.info("xG con datos de Understat")
-
-# Después de mostrar visualizaciones
-st.markdown("---")
-pdf_cols = st.columns([1, 3])
-
-with pdf_cols[0]:
-    st.markdown("<h4 style='text-align: left;'>Exportar Informe</h4>", unsafe_allow_html=True)
-    if st.button("Generar PDF", key="generate_pdf"):
-        # Adapta este diccionario a los datos de esta página
-        pdf_data = {
-            "Información General": "Visualizaciones Atlético de Madrid temporada 24/25",
-            "Gráficos": "Resumen de visualizaciones generadas",
-            # Añade los datos específicos de esta página
-        }
-        
-        # Generar PDF
-        pdf_bytes = export_to_pdf(
-            pdf_data, 
-            filename=f"visualizaciones_atm_{datetime.now().strftime('%d%m%Y')}.pdf",
-            title="Informe Atlético de Madrid - Visualizaciones 24/25"
-        )
-        
-        st.session_state.pdf_bytes = pdf_bytes
-        st.session_state.pdf_filename = f"visualizaciones_atm_{datetime.now().strftime('%d%m%Y')}.pdf"
-        st.success("PDF generado correctamente")
-    
-# Si hay un PDF generado, mostrar el botón de descarga
-if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
-    with pdf_cols[0]:
-        download_pdf_button(
-            st.session_state.pdf_bytes,
-            filename=st.session_state.pdf_filename
-        )
-
-# Crear contenedor para botón de PDF y footer
-
 # Crear contenedor para botón de PDF y footer sin línea divisoria
 st.markdown("---")
 footer_container = st.container()
 
 with footer_container:
-    # Usa un espacio para crear más separación con el contenido anterior
-    st.write("")
-    st.write("")
-    st.write("")
-    st.write("")
-    
+   
     footer_cols = st.columns([1, 2, 1])
     
     # Columna izquierda - Botón PDF con texto incluido
     with footer_cols[0]:
         if st.button("📑 Exportar Informe PDF", key="generate_pdf"):
-            # Crear diccionario con datos para el PDF
             pdf_data = {
-                "Información General": "Informe de métricas del Atlético de Madrid temporada 24/25",
-                f"Tabla de Jugadores ({', '.join(metric_categories)})": filtered_players[display_columns],
-                f"Ranking de {ranking_metric1}": top_players1[['Jugador', ranking_metric1]],
-                f"Ranking de {ranking_metric2}": top_players2[['Jugador', ranking_metric2]],
-                f"Ranking de {ranking_metric3}": top_players3[['Jugador', ranking_metric3]]
+                "Información General": "Visualizaciones Atlético de Madrid temporada 24/25",
+                "Gráficos": "Resumen de visualizaciones generadas",
+                # Añade los datos específicos de esta página
             }
-            
+
             # Generar PDF
             pdf_bytes = export_to_pdf(
                 pdf_data, 
@@ -134,11 +120,11 @@ with footer_container:
                 title="Informe Atlético de Madrid - Métricas 24/25"
             )
             
-            # Mostrar botón de descarga
+            # Mostrar botón de descarga - MOVIDO DENTRO DEL BLOQUE IF
             st.session_state.pdf_bytes = pdf_bytes
             st.session_state.pdf_filename = f"informe_atm_{datetime.now().strftime('%d%m%Y')}.pdf"
             st.success("PDF generado correctamente")
-        
+
         # Si hay un PDF generado, mostrar el botón de descarga
         if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
             download_pdf_button(
@@ -176,7 +162,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar con navegación al final
 with st.sidebar:
     # Espacio flexible
     st.markdown('<div style="flex-grow: 1;"></div>', unsafe_allow_html=True)
@@ -208,3 +193,4 @@ with st.sidebar:
         }
         </style>
     """, unsafe_allow_html=True)
+    

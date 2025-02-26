@@ -120,5 +120,53 @@ def load_all_styles():
             .subtitle { font-size: 1.2em; }
             div[data-testid="stImage"] img { max-width: 100px !important; }
         }
-        </style>
-    """, unsafe_allow_html=True)
+        /* Reducir espaciado general en toda la aplicación */
+                .block-container {
+                padding-top: 0.5rem !important;
+                padding-bottom: 0rem !important;
+                margin-top: -15px !important;
+        }
+    
+        /* Reducir espacios entre elementos */
+            div[data-testid="stVerticalBlock"] > div {
+            margin-bottom: 0.2rem !important;
+        }
+    
+        /* Reducir tamaño de títulos */
+                h1 {
+                font-size: 1.8rem !important;
+                margin-bottom: 0.2rem !important;
+                }
+    
+                h2 {
+                font-size: 1.5rem !important;
+                margin-bottom: 0.2rem !important;
+                }
+    
+                h3, h4, h5 {
+                font-size: 1.2rem !important;
+                margin-bottom: 0.1rem !important;
+                }
+    
+                /* Reducir espacio en elementos de formulario */
+                div[data-testid="stFormSubmitButton"] {
+                margin-top: 0.5rem !important;
+                }
+    
+        /* Compactar selectores múltiples */
+                div[data-testid="stMultiSelect"] {
+                margin-bottom: 0.3rem !important;
+                }
+                
+        /* Ajustar espacio del encabezado */
+                div.stHorizontalBlock:first-child {
+                margin-top: 15px !important;
+                padding-top: 10px !important;
+                }
+    
+        /* Ajustar espacio para el logo */
+                div.stHorizontalBlock:first-child div.column:nth-child(2) {
+                padding-top: 10px !important;
+                }
+    </style>
+""", unsafe_allow_html=True)

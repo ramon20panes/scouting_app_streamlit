@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 # Obtener la ruta absoluta a la base de datos
-DB_PATH = Path(__file__).parent.parent / "data/FData/stats/stats_big5_24_25.db"
+DB_PATH = Path(__file__).parent.parent / "FData/stats/stats_big5_24_25.db"
 
 def get_connection():
     """Establece conexión con la base de datos SQLite."""

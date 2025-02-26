@@ -39,7 +39,7 @@ def login():
             st.session_state.last_activity = datetime.now()  # Inicializar última actividad
             st.success("¡Bienvenido a la aplicación!", icon="✅")
             time.sleep(0.5)
-            st.session_state.redirect_to = "1_Stats 24 25"
+            st.session_state.redirect_to = "1_📊Stats 24 25"
             st.rerun()
         else:
             st.error('Usuario o contraseña incorrectos', icon="🚨")
