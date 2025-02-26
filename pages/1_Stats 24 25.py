@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 import sqlite3
 import sys
-import plotly.express as px
-import plotly.graph_objects as go
 from pathlib import Path
 from utils.auth import check_auth, logout
 from common.database import get_players_atleti, categorize_metrics
-from common.pdf_export import export_to_pdf
-from common.pdf_export import download_pdf_button
+from common.pdf_export import export_to_pdf, download_pdf_button
+import base64
+from datetime import datetime
+from utils.styles import load_all_styles
 
 # Configuración de la página
 st.set_page_config(
@@ -18,24 +18,45 @@ st.set_page_config(
     layout="wide"
 )
 
+# Cargar estilos al principio del archivo
+load_all_styles()
+
+# Mostrar sidebar explícitamente - COLOCADO DESPUÉS DE LOAD_ALL_STYLES
+st.markdown("""
+<style>
+[data-testid="stSidebar"][aria-expanded="false"],
+[data-testid="stSidebar"][aria-expanded="true"],
+div[data-testid="collapsedControl"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Verificar autenticación
 if not check_auth():
     st.switch_page("Aplic_Direcc_Deport.py")
 
-ESCUDO_PATH = Path("assets/escudos/atm.png")
+# Cargar estilos al principio del archivo
+load_all_styles()
 
+ESCUDO_PATH = Path("assets/escudos/atm.png")
+    
 # Título con escudo
-col_title, col_logo = st.columns([1, 1])
+col_title, col_logo = st.columns([4, 1])
 
 with col_title:
     st.markdown("""
-        <h2 style='text-align: right; margin-top: -10px;'>
+        <h2 style='text-align: left; margin-top: -10px;'>
             Métricas 24/25
         </h2>
     """, unsafe_allow_html=True)
 
 with col_logo:
-    st.image(ESCUDO_PATH, width=50)
+    st.image(ESCUDO_PATH, width=100)
 
 # Cargar datos de jugadores del Atlético
 @st.cache_data(ttl=3600)
@@ -50,7 +71,7 @@ else:
     # Categorizar métricas
     categorized_metrics = categorize_metrics(player_data.columns)
     
-    filter_col1, filter_col2 = st.columns([3, 1])
+    filter_col1, filter_col2 = st.columns([4, 1])
     
     with filter_col1:
         # Selector de categorías para la tabla
@@ -92,20 +113,16 @@ else:
             subset=[m for m in selected_table_metrics if m in filtered_players.columns]
         ),
         use_container_width=True,
-        height=300
+        height=400
     )
     
     # SECCIÓN 2: Rankings con slider de minutos
-    col_title2, col_logo2 = st.columns([1, 1])
-    with col_title2:
-        st.markdown("""
-            <h2 style='text-align: right; margin-top: -10px;'>
-                Ránkings
-            </h2>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+        <h2 style='text-align: left; margin-top: -10px;'>
+            Ránkings
+        </h2>
+    """, unsafe_allow_html=True)
 
-    with col_logo2:
-        st.image(ESCUDO_PATH, width=50)
     
     # Fila para controles de ranking
     rank_control_cols = st.columns([3, 1])
@@ -147,52 +164,25 @@ else:
     
     with ranking_cols[0]:
         # Top jugadores para métrica 1
-        top_players1 = rank_players.sort_values(by=ranking_metric1, ascending=False).head(3)
+        top_players1 = rank_players.sort_values(by=ranking_metric1, ascending=False).head(5)
         st.markdown(f"<h5 style='text-align: center;'>Top {ranking_metric1}</h5>", unsafe_allow_html=True)
         for i, (_, player) in enumerate(top_players1.iterrows(), 1):
             st.markdown(f"{i}. {player['Jugador']} - {player[ranking_metric1]}")
     
     with ranking_cols[1]:
         # Top jugadores para métrica 2
-        top_players2 = rank_players.sort_values(by=ranking_metric2, ascending=False).head(3)
+        top_players2 = rank_players.sort_values(by=ranking_metric2, ascending=False).head(5)
         st.markdown(f"<h5 style='text-align: center;'>Top {ranking_metric2}</h5>", unsafe_allow_html=True)
         for i, (_, player) in enumerate(top_players2.iterrows(), 1):
             st.markdown(f"{i}. {player['Jugador']} - {player[ranking_metric2]}")
     
     with ranking_cols[2]:
         # Top jugadores para métrica 3
-        top_players3 = rank_players.sort_values(by=ranking_metric3, ascending=False).head(3)
+        top_players3 = rank_players.sort_values(by=ranking_metric3, ascending=False).head(5)
         st.markdown(f"<h5 style='text-align: center;'>Top {ranking_metric3}</h5>", unsafe_allow_html=True)
         for i, (_, player) in enumerate(top_players3.iterrows(), 1):
-            st.markdown(f"{i}. {player['Jugador']} - {player[ranking_metric3]}")
+            st.markdown(f"{i}. {player['Jugador']} - {player[ranking_metric3]}")        
     
-    # SECCIÓN 3: Área de visualizaciones
-    col_title2, col_logo2 = st.columns([1, 1])
-    with col_title2:
-        st.markdown("""
-            <h2 style='text-align: right; margin-top: -10px;'>
-                Visualizaciones
-            </h2>
-        """, unsafe_allow_html=True)
-
-    with col_logo2:
-        st.image(ESCUDO_PATH, width=50)
-    
-    # Tres columnas para las visualizaciones
-    viz_col1, viz_col2, viz_col3 = st.columns(3)
-    
-    with viz_col1:
-        st.markdown("<h4 style='text-align: center;'>Clasificación LaLiga</h4>", unsafe_allow_html=True)
-        st.info("Gráfico de clasificación con liga_positions_24_25.csv")
-    
-    with viz_col2:
-        st.markdown("<h4 style='text-align: center;'>Timeline LaLiga 24/25</h4>", unsafe_allow_html=True)
-        st.info("Timeline con datos de la API")
-    
-    with viz_col3:
-        st.markdown("<h4 style='text-align: center;'>Expected Goals (xG)</h4>", unsafe_allow_html=True)
-        st.info("xG con datos de Understat")
-
 # Obtener el nombre de la página actual
 current_page = __file__.split('\\')[-1]
 
@@ -203,6 +193,80 @@ if "page_history" not in st.session_state:
 # Actualizar historial solo si es una página nueva
 if not st.session_state.page_history or st.session_state.page_history[-1] != current_page:
     st.session_state.page_history.append(current_page)
+
+# Crear contenedor para botón de PDF y footer sin línea divisoria
+st.markdown("---")
+footer_container = st.container()
+
+with footer_container:
+    # Usa un espacio para crear más separación con el contenido anterior
+    st.write("")
+    st.write("")
+    st.write("")
+    st.write("")
+    
+    footer_cols = st.columns([1, 2, 1])
+    
+    # Columna izquierda - Botón PDF con texto incluido
+    with footer_cols[0]:
+        if st.button("📑 Exportar Informe PDF", key="generate_pdf"):
+            # Crear diccionario con datos para el PDF
+            pdf_data = {
+                "Información General": "Informe de métricas del Atlético de Madrid temporada 24/25",
+                f"Tabla de Jugadores ({', '.join(metric_categories)})": filtered_players[display_columns],
+                f"Ranking de {ranking_metric1}": top_players1[['Jugador', ranking_metric1]],
+                f"Ranking de {ranking_metric2}": top_players2[['Jugador', ranking_metric2]],
+                f"Ranking de {ranking_metric3}": top_players3[['Jugador', ranking_metric3]]
+            }
+            
+            # Generar PDF
+            pdf_bytes = export_to_pdf(
+                pdf_data, 
+                filename=f"informe_atm_{datetime.now().strftime('%d%m%Y')}.pdf",
+                title="Informe Atlético de Madrid - Métricas 24/25"
+            )
+            
+            # Mostrar botón de descarga
+            st.session_state.pdf_bytes = pdf_bytes
+            st.session_state.pdf_filename = f"informe_atm_{datetime.now().strftime('%d%m%Y')}.pdf"
+            st.success("PDF generado correctamente")
+        
+        # Si hay un PDF generado, mostrar el botón de descarga
+        if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
+            download_pdf_button(
+                st.session_state.pdf_bytes,
+                filename=st.session_state.pdf_filename
+            )
+    
+    # Columna central - Espacio vacío
+    with footer_cols[1]:
+        pass
+    
+    # Columna derecha - Solo autor, ajustado verticalmente
+    with footer_cols[2]:
+        st.markdown("""
+            <div style="text-align: right; margin-top: 5px;">
+                <strong>Ramón González</strong><br>
+                Mod8 MPAD
+            </div>
+        """, unsafe_allow_html=True)
+
+    # CSS adicional para que el footer se vea correctamente con el botón PDF
+st.markdown("""
+    <style>
+    /* Ajustes para la sección del footer */
+    .author-container {
+        position: relative !important;
+        text-align: right;
+        margin-top: 20px;
+    }
+    .footer-container {
+        position: relative !important;
+        text-align: right;
+        margin-top: 5px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Sidebar con navegación al final
 with st.sidebar:
