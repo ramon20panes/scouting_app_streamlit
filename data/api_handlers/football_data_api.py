@@ -22,13 +22,13 @@ def load_teams_mapping():
         for delimiter in delimiters:
             try:
                 # Leer el CSV con el delimitador actual
-                df = pd.read_csv(csv_path, sep=';', dtype=str)
+                df_tm = pd.read_csv(csv_path, sep=';', dtype=str)
                 
                 # Imprimir información de depuración
                 print(f"Leyendo con delimitador: '{delimiter}'")
-                print("Columnas en el CSV:", list(df.columns))
+                print("Columnas en el CSV:", list(df_tm.columns))
                 print("Primeras filas:")
-                print(df.head())
+                print(df_tm.head())
                 
                 # Mapeo manual para manejar variaciones de nombres
                 manual_name_mapping = {
@@ -45,7 +45,7 @@ def load_teams_mapping():
                 
                 # Crear diccionario de mapeo
                 team_mapping = {}
-                for _, row in df.iterrows():
+                for _, row in df_tm.iterrows():
                     # Usar la primera columna como nombre del equipo
                     nombre_csv = row.iloc[0]
                     shortname = row.iloc[1].lower()  # Asumiendo que la segunda columna es el shortname
@@ -227,42 +227,42 @@ def process_matches(matches, team_mapping=None):
     
     return pd.DataFrame(data)
 
-def transform_dataframe(df, team_mapping=None):
+def transform_dataframe(df_tm, team_mapping=None):
     """
     Realiza transformaciones adicionales al DataFrame
     
     Args:
-        df (pd.DataFrame): DataFrame original
+        df_tm (pd.DataFrame): DataFrame original
         
     Returns:
         pd.DataFrame: DataFrame transformado
     """
     # Crear copia para no modificar el original
-    df_new = df.copy()
+    df_tm_new = df_tm.copy()
     
     # Convertir fecha a solo día
-    df_new['date'] = pd.to_datetime(df_new['date']).dt.strftime('%Y-%m-%d')
+    df_tm_new['date'] = pd.to_datetime(df_tm_new['date']).dt.strftime('%Y-%m-%d')
         
     # Crear columna de jornada
-    df_new['jornada'] = range(1, len(df_new) + 1)
+    df_tm_new['jornada'] = range(1, len(df_tm_new) + 1)
     
     # Cargar el mapeo real de equipos
     if team_mapping is None:
         team_mapping = load_teams_mapping()
     
     # Aplicar el mapeo a los nombres de los oponentes y agregar ruta al escudo
-    df_new['opponent_display'] = df_new['opponent'].apply(
+    df_tm_new['opponent_display'] = df_tm_new['opponent'].apply(
         lambda x: find_closest_team_name(x, team_mapping)
     )
-    df_new['opponent_logo'] = df_new['opponent_display'].apply(
+    df_tm_new['opponent_logo'] = df_tm_new['opponent_display'].apply(
         lambda x: team_mapping.get(x, {}).get('logo_path', None)
     )
     
     # Reordenar columnas
-    df_new = df_new[['jornada', 'date', 'opponent', 'opponent_display', 'opponent_logo', 
+    df_tm_new = df_tm_new[['jornada', 'date', 'opponent', 'opponent_display', 'opponent_logo', 
                      'location', 'result', 'points', 'cumulative_points', 'score']]
     
-    return df_new
+    return df_tm_new
 
 def get_atletico_matches(api_key):
     """
@@ -286,6 +286,6 @@ def get_atletico_matches(api_key):
             print(f"  - {team}")
         
         # Procesar usando el mismo mapeo
-        df = process_matches(matches, team_mapping)
-        return transform_dataframe(df, team_mapping)
+        df_tm = process_matches(matches, team_mapping)
+        return transform_dataframe(df_tm, team_mapping)
     return None

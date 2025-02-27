@@ -8,13 +8,20 @@ from datetime import datetime
 from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
-from utils.styles import load_all_styles
-from utils.visualization import create_bumpy_chart 
 import highlight_text
+from highlight_text import fig_text
+
 import os
 from dotenv import load_dotenv
+
+from utils.styles import load_all_styles
+from utils.visualization import create_bumpy_chart 
+
 from utils.visualization import create_bumpy_chart, create_match_timeline
 from data.api_handlers.football_data_api import load_teams_mapping, get_atletico_matches
+
+from data.data_processing.understat_data import get_atletico_data
+from utils.visualization import plot_atletico_xg_differential
 
 # Configuración de la página
 st.set_page_config(
@@ -105,7 +112,7 @@ with tab1:
         return pd.read_csv(csv_path)
     
     try:
-        df = load_liga_positions()
+        df_cla = load_liga_positions()
     
         # Inicializar valores por defecto si es la primera vez
         if "highlight_teams" not in st.session_state:
@@ -114,7 +121,7 @@ with tab1:
         # Seleccionar equipos a destacar con estado persistente
         highlight_teams = st.multiselect(
             "Equipos a destacar:",
-            df["Equipo"].tolist(),
+            df_cla["Equipo"].tolist(),
             default=st.session_state.highlight_teams
         )
 
@@ -122,12 +129,13 @@ with tab1:
         st.session_state.highlight_teams = highlight_teams
     
         # Crear y mostrar el gráfico
-        fig, ax = create_bumpy_chart(df, highlight_teams)
+        fig, ax = create_bumpy_chart(df_cla, highlight_teams)
         st.pyplot(fig)
     
     except Exception as e:
         st.error(f"Error al cargar o procesar los datos: {str(e)}")
 
+# ----------------------------------------------------------------
 # TAB 2 - Timeline Partidos
 with tab2:
     st.subheader("Timeline de Partidos")
@@ -165,10 +173,37 @@ with tab2:
     
     except Exception as e:
         st.error(f"Error al cargar o procesar los datos: {str(e)}")
+
+# ----------------------------------------------------------------
 # TAB 3 - Expected Goals
 with tab3:
     st.subheader("Análisis xG por Jornada")
-    st.info("Esta visualización se implementará próximamente. Mostrará gráficos de xG (Expected Goals) para todas las jornadas, usando datos de Understat.")
+    
+    # Cargar datos
+    try:
+        with st.spinner("Cargando datos de xG desde Understat..."):
+                        
+            df_expcGL, df1 = get_atletico_data()
+        
+        # Mostrar gráfico
+        fig = plot_atletico_xg_differential(df_expcGL, df1)
+        st.pyplot(fig)
+        
+        # Mostrar datos en una tabla expandible
+        with st.expander("Ver datos en tabla"):
+            st.dataframe(df_expcGL.style.format({
+                'xG': '{:.2f}', 
+                'xGA': '{:.2f}',
+                'xGdif': '{:.2f}',
+                'npxG': '{:.2f}',
+                'npxGA': '{:.2f}',
+                'xpts': '{:.2f}',
+                'npxGD': '{:.2f}'
+            }))
+                
+    except Exception as e:
+        st.error(f"Error al cargar o procesar los datos de xG: {str(e)}")
+        st.error("Asegúrate de tener instalada la librería 'lxml' y 'highlight-text': pip install lxml highlight-text")
 
 # Obtener el nombre de la página actual
 current_page = __file__.split('\\')[-1]
@@ -195,36 +230,67 @@ with footer_container:
                 # Obtener figuras actuales
                 figures = {}
         
-                # Clasificación
-                if "highlight_teams" in st.session_state and df is not None:
-                    fig1, _ = create_bumpy_chart(df, st.session_state.highlight_teams)
-                    figures["Clasificación LaLiga"] = fig1
+                # 1. Clasificación (Tab 1) - Con diagnóstico detallado
+                try:
+                    if "highlight_teams" in st.session_state and df_cla is not None:
+                                
+                        # Buscar si hay alguna columna que podría contener nombres de equipos
+                        possible_team_columns = [col for col in df_cla.columns if any(word in col.lower() for word in ['equipo', 'team', 'club', 'nombre'])]
+                                
+                        # Intentar adaptar el DataFrame antes de llamar a create_bumpy_chart
+                        df_cla_copy = df_cla.copy()
         
-                # Timeline de partidos
-                if 'matches_df' in locals() and 'team_mapping' in locals() and matches_df is not None and team_mapping is not None:
-                    fig2 = create_match_timeline(matches_df, team_mapping)
-                    figures["Timeline Partidos"] = fig2
+                        # Si no existe 'Equipo' pero hay columnas similares, renombrar la primera
+                        if 'Equipo' not in df_cla.columns and possible_team_columns:
+                            df_cla_copy.rename(columns={possible_team_columns[0]: 'Equipo'}, inplace=True)
+                            st.write(f"Renombrando columna {possible_team_columns[0]} a 'Equipo'")
         
+                        # Generar el gráfico con el DataFrame adaptado
+                        fig1, _ = create_bumpy_chart(df_cla_copy, st.session_state.highlight_teams)
+                        figures["Clasificación LaLiga"] = fig1
+                except Exception as e:
+                    st.error(f"No se pudo incluir el gráfico de clasificación: {str(e)}")
+
+                # 2. Timeline (Tab 2)
+                try:
+                    if 'matches_df' in locals() and 'team_mapping' in locals():
+                        if matches_df is not None and team_mapping is not None:
+                            fig2 = create_match_timeline(matches_df, team_mapping)
+                            figures["Timeline Partidos"] = fig2
+                except Exception as e:
+                    st.warning(f"No se pudo incluir el gráfico de timeline: {str(e)}")
+            
+                # 3. Análisis xG (Tab 3)
+                try:
+                    # Obtener datos frescos usando tu función
+                    
+                    df_expcGL_xg, df1_xg = get_atletico_data()
+                    fig3 = plot_atletico_xg_differential(df_expcGL, df1_xg)
+                    figures["Análisis xG"] = fig3
+                except Exception as e:
+                    st.warning(f"No se pudo incluir el gráfico xG: {str(e)}")
+
+                # IMPORTANTE: Solo texto en pdf_data, no DataFrames
                 pdf_data = {
                     "Información General": "Visualizaciones Atlético de Madrid temporada 24/25",
-                    "Clasificación LaLiga": "Evolución de posiciones en la liga",
-                    "Timeline Partidos": "Calendario y resultados de partidos",
-                    "Análisis xG": "Análisis de Expected Goals por jornada (próximamente)"
+                    "Clasificación LaLiga": "Evolución de posiciones en la liga durante la temporada actual",
+                    "Timeline Partidos": "Calendario y resultados de partidos disputados",
+                    "Análisis xG": "Análisis de Expected Goals por jornada"
                 }
 
                 # Generar PDF
                 pdf_bytes = export_to_pdf(
-                    pdf_data, 
-                    figures=figures,
+                    pdf_data,  # Solo texto
+                    figures=figures,  # Figuras por separado
                     filename=f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf",
                     title="Informe Atlético de Madrid - Visualizaciones 24/25"
                 )
-        
+
                 # Mostrar botón de descarga
                 st.session_state.pdf_bytes = pdf_bytes
                 st.session_state.pdf_filename = f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf"
                 st.success("PDF generado correctamente")
-        
+
             except Exception as e:
                 st.error(f"Error al generar el PDF: {str(e)}")
 

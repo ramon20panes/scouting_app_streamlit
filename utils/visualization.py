@@ -6,9 +6,9 @@ from mplsoccer import Bumpy
 import highlight_text
 from pathlib import Path
 import highlight_text
+from highlight_text import fig_text
 from PIL import Image
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-from pathlib import Path
 
 # Definir función para crear un gráfico bumpy chart
 def create_bumpy_chart(df, highlight_teams=None):
@@ -128,7 +128,7 @@ def create_bumpy_chart(df, highlight_teams=None):
         s='Progresión Clasificación LaLiga 24/25',
         x=.5, 
         y=.95,
-        c='black',  
+        c='darkblue',  
         size=18,
         weight='bold',
         ha='center'
@@ -300,7 +300,7 @@ def get_team_logo(team_name, team_mapping, default_scale=0.08):
     
     return None
 
-def create_match_timeline(df, team_mapping):
+def create_match_timeline(df_tm, team_mapping):
     """
     Crea un timeline de partidos del Atlético usando matplotlib
     
@@ -320,7 +320,7 @@ def create_match_timeline(df, team_mapping):
     bar_width = 0.5
 
     # Dibujar barras y escudos
-    for idx, row in df.iterrows():
+    for idx, row in df_tm.iterrows():
         height = row['points']
         ax.bar(row['jornada'], height, color=colors[row['result']], alpha=0.7, width=bar_width)
         
@@ -396,11 +396,11 @@ def create_match_timeline(df, team_mapping):
              pad=65)  # Aumentar el pad para subir el título
 
     # Calcular estadísticas
-    total_matches = len(df)
-    total_points = df['points'].sum()
-    wins = len(df[df['result'] == 'W'])
-    draws = len(df[df['result'] == 'D'])
-    losses = len(df[df['result'] == 'L'])
+    total_matches = len(df_tm)
+    total_points = df_tm['points'].sum()
+    wins = len(df_tm[df_tm['result'] == 'W'])
+    draws = len(df_tm[df_tm['result'] == 'D'])
+    losses = len(df_tm[df_tm['result'] == 'L'])
 
     # Añadir estadísticas en la parte inferior
     stats_text = (
@@ -419,4 +419,91 @@ def create_match_timeline(df, team_mapping):
 
     plt.tight_layout()
     
+    return fig
+
+# ----------------------------------------------------------------
+# Función para visualización de xG de la temporada
+
+def plot_atletico_xg_differential(df_expcGL, df1):
+    """
+    Genera un gráfico de barras horizontales para visualizar la diferencia de xG por partido
+    del Atlético de Madrid con las jornadas invertidas, considerando solo partidos jugados.
+    """
+    # Asegurarnos de que trabajamos solo con los partidos jugados
+    df_expcGL = df_expcGL.copy()
+    
+    # Obtener las etiquetas de jornadas para los partidos jugados
+    jornada_labels = df1['jornada'].tolist()[:len(df_expcGL)]
+    
+    # Invertir el orden para mostrar jornada 1 arriba
+    df_expcGL_inverted = df_expcGL.iloc[::-1].reset_index(drop=True)
+    jornada_labels_inverted = jornada_labels.copy()
+    jornada_labels_inverted.reverse()
+    
+    # Crear posiciones Y para el gráfico
+    y_positions = np.arange(1, len(df_expcGL_inverted) + 1)
+    
+    # Separar diferencias positivas y negativas
+    df_expcGL_pos = df_expcGL_inverted[df_expcGL_inverted['xGdif'] > 0].copy()
+    df_expcGL_neg = df_expcGL_inverted[df_expcGL_inverted['xGdif'] < 0].copy()
+    
+    # Asignar posiciones Y a cada fila
+    df_expcGL_inverted['y_pos'] = y_positions
+    df_expcGL_pos = df_expcGL_inverted[df_expcGL_inverted['xGdif'] > 0].copy()  # Recalcular con las nuevas posiciones
+    df_expcGL_neg = df_expcGL_inverted[df_expcGL_inverted['xGdif'] < 0].copy()  # Recalcular con las nuevas posiciones
+    
+    # Configurar gráfico
+    plt.style.use('fivethirtyeight')
+    fig, ax = plt.subplots(figsize=(5, 3))
+    
+    # Cambiar fondo
+    fig.patch.set_facecolor('#d4d4d4')
+    ax.set_facecolor('#d4d4d4')
+
+    # Eliminar el borde del gráfico
+    ax.spines['top'].set_visible(True)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    
+    # Dibujar barras
+    bar_height = 0.5
+    plt.hlines(y=df_expcGL_pos['y_pos'], xmin=0, xmax=df_expcGL_pos['xGdif'], 
+               color='green', alpha=0.7, linewidth=bar_height*10)
+    plt.hlines(y=df_expcGL_neg['y_pos'], xmin=0, xmax=df_expcGL_neg['xGdif'], 
+               color='red', alpha=0.7, linewidth=bar_height*10)
+    
+    # Configuración de ejes
+    ax.tick_params(axis='x', colors='darkblue')
+    ax.tick_params(axis='y', colors='darkblue')
+    plt.xticks([-3, -2, -1, 0, 1, 2, 3, 4, 5], fontsize=5, weight='bold')
+    plt.yticks(y_positions, jornada_labels_inverted, rotation='horizontal', fontsize=5, color='darkblue', weight='bold')
+    
+    # Ajustes visuales
+    ax.tick_params(axis='y', pad=1, which='both', left=True)
+    plt.gca().xaxis.grid(False)
+    plt.gca().yaxis.grid(False)
+    
+    # Anotaciones
+    for i, row in df_expcGL_pos.iterrows():
+        plt.annotate(f"{row['xGdif']:.1f}", 
+                     (row['xGdif'] + 0.2, row['y_pos']),
+                     c='green', size=6, ha='center', va='center', weight='bold')
+    
+    for i, row in df_expcGL_neg.iterrows():
+        plt.annotate(f"{row['xGdif']:.1f}", 
+                     (row['xGdif'] - 0.2, row['y_pos']),
+                     c='red', size=6, ha='center', va='center', weight='bold')
+    
+    # Títulos
+    fig_text(0.18, 1.01, s="Diferencial xG, Atleti 24-25", fontsize=10, weight='bold', color="darkblue")
+    fig_text(0.218, 0.95, s=" <Negativo xG>     <Positivo xG>", 
+             highlight_textprops=[{"color":'red'}, {'color':"green"}], 
+             fontsize=8, fontweight="bold")
+    
+    # Etiqueta eje X
+    fig_text(0.33, 0.005, s="Diferencial xG", fontsize=6, fontweight="bold", color="darkblue")
+    
+    # Ajustar márgenes
+    plt.subplots_adjust(left=0.1, right=0.92, top=0.90, bottom=0.05)
     return fig
