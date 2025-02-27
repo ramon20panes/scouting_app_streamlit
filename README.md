@@ -9,7 +9,7 @@ La aplicación permite realizar un seguimiento completo del rendimiento del equi
 - **Análisis Histórico**: 
  Seguimiento detallado de la evolución del equipo durante la temporada actual, presentando métricas clave, rankings y tendencias de rendimiento.
 
--**Visualizaciones**:
+- **Visualizaciones**:
  Muestra tres gráficos relacionados con la evolución en la clasificación, de resultados y el xG.
 
 - **Análisis de Jornada**: 
