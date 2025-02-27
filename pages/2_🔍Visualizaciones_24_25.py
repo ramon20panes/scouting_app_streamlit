@@ -185,33 +185,50 @@ if not st.session_state.page_history or st.session_state.page_history[-1] != cur
 st.markdown("---")
 footer_container = st.container()
 
-with footer_container:
-        
+with footer_container:        
     footer_cols = st.columns([1, 2, 1])
     
     # Columna izquierda - Botón PDF con texto incluido
     with footer_cols[0]:
         if st.button("📑 Exportar Informe PDF", key="generate_pdf"):
-            pdf_data = {
-                "Información General": "Visualizaciones Atlético de Madrid temporada 24/25",
-                "Clasificación LaLiga": "Evolución de posiciones en la liga",
-                "Timeline Partidos": "Calendario y resultados de partidos",
-                "Análisis xG": "Análisis de Expected Goals por jornada"
-            }
+            try:
+                # Obtener figuras actuales
+                figures = {}
+        
+                # Clasificación
+                if "highlight_teams" in st.session_state and df is not None:
+                    fig1, _ = create_bumpy_chart(df, st.session_state.highlight_teams)
+                    figures["Clasificación LaLiga"] = fig1
+        
+                # Timeline de partidos
+                if 'matches_df' in locals() and 'team_mapping' in locals() and matches_df is not None and team_mapping is not None:
+                    fig2 = create_match_timeline(matches_df, team_mapping)
+                    figures["Timeline Partidos"] = fig2
+        
+                pdf_data = {
+                    "Información General": "Visualizaciones Atlético de Madrid temporada 24/25",
+                    "Clasificación LaLiga": "Evolución de posiciones en la liga",
+                    "Timeline Partidos": "Calendario y resultados de partidos",
+                    "Análisis xG": "Análisis de Expected Goals por jornada (próximamente)"
+                }
 
-            # Generar PDF
-            pdf_bytes = export_to_pdf(
-                pdf_data, 
-                filename=f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf",
-                title="Informe Atlético de Madrid - Visualizaciones 24/25"
-            )
-            
-            # Mostrar botón de descarga
-            st.session_state.pdf_bytes = pdf_bytes
-            st.session_state.pdf_filename = f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf"
-            st.success("PDF generado correctamente")
+                # Generar PDF
+                pdf_bytes = export_to_pdf(
+                    pdf_data, 
+                    figures=figures,
+                    filename=f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf",
+                    title="Informe Atlético de Madrid - Visualizaciones 24/25"
+                )
+        
+                # Mostrar botón de descarga
+                st.session_state.pdf_bytes = pdf_bytes
+                st.session_state.pdf_filename = f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf"
+                st.success("PDF generado correctamente")
+        
+            except Exception as e:
+                st.error(f"Error al generar el PDF: {str(e)}")
 
-        # Si hay un PDF generado, mostrar el botón de descarga
+                 # Si hay un PDF generado, mostrar el botón de descarga
         if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
             download_pdf_button(
                 st.session_state.pdf_bytes,

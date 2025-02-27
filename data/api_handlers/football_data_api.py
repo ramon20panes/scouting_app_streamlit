@@ -22,7 +22,7 @@ def load_teams_mapping():
         for delimiter in delimiters:
             try:
                 # Leer el CSV con el delimitador actual
-                df = pd.read_csv(csv_path, sep=delimiter, dtype=str)
+                df = pd.read_csv(csv_path, sep=';', dtype=str)
                 
                 # Imprimir información de depuración
                 print(f"Leyendo con delimitador: '{delimiter}'")
@@ -95,6 +95,29 @@ def find_closest_team_name(api_name, team_mapping):
     if api_name in team_mapping:
         return api_name
     
+    # Simplificar nombres para comparación
+    simplified_api_name = api_name.lower().replace("club", "").replace("de", "").replace("cf", "").replace("fc", "").strip()
+    
+    # Mapeo para casos especiales
+    special_cases = {
+        'espanyol': 'RCD Espanyol de Barcelona',
+        'leganes': 'CD Leganés',
+        'real sociedad': 'Real Sociedad de Fútbol',
+        'real madrid': 'Real Madrid CF',
+        'valladolid': 'Real Valladolid CF',
+        # Añade más casos según necesites
+    }
+    
+    # Comprobar casos especiales
+    for key, value in special_cases.items():
+        if key in simplified_api_name:
+            if value in team_mapping:
+                return value
+    
+    # Buscar coincidencias parciales
+    best_match = None
+    best_score = 0
+    
     # Buscar coincidencias parciales
     for mapped_name, details in team_mapping.items():
         # Comparaciones sin considerar mayúsculas/minúsculas
@@ -102,9 +125,20 @@ def find_closest_team_name(api_name, team_mapping):
             api_name.lower() in mapped_name.lower() or
             details['original_name'].lower() in api_name.lower() or
             api_name.lower() in details['original_name'].lower()):
-            return mapped_name
+            # Calcular un "score" simple de coincidencia
+            name_length = len(api_name)
+            match_length = len(mapped_name)
+            score = min(name_length, match_length) / max(name_length, match_length)
+            
+            if score > best_score:
+                best_score = score
+                best_match = mapped_name
     
-    # Si no se encuentra, devolver el nombre original
+    if best_match:
+        return best_match
+    
+    # Si no se encuentra, registrar y devolver el nombre original
+    print(f"⚠️ No se encontró coincidencia para el equipo: {api_name}")
     return api_name
 
 def fetch_matches(api_key):
@@ -137,18 +171,20 @@ def fetch_matches(api_key):
     
     return _fetch_api_data(url, headers)
 
-def process_matches(matches):
+def process_matches(matches, team_mapping=None):
     """
     Procesa los datos de partidos para el formato requerido
     
     Args:
         matches (list): Lista de partidos desde la API
+        team_mapping (dict, optional): Mapeo de equipos precargado
         
     Returns:
         pd.DataFrame: DataFrame con los datos procesados
     """
-    # Cargar el mapeo de equipos
-    team_mapping = load_teams_mapping()
+    # Cargar el mapeo de equipos si no se proporcionó
+    if team_mapping is None:
+        team_mapping = load_teams_mapping()
     
     data = []
     cumulative_points = 0
@@ -167,14 +203,15 @@ def process_matches(matches):
                 home_goals = match['score']['fullTime']['home']
                 away_goals = match['score']['fullTime']['away']
                 
+                # Mantener formato Local-Visitante para el marcador
+                score = f"{home_goals}-{away_goals}"
+                
                 if is_home:
                     points = 3 if home_goals > away_goals else (1 if home_goals == away_goals else 0)
                     result = 'W' if home_goals > away_goals else ('D' if home_goals == away_goals else 'L')
-                    score = f"{home_goals}-{away_goals}"
                 else:
                     points = 3 if away_goals > home_goals else (1 if home_goals == away_goals else 0)
                     result = 'W' if away_goals > home_goals else ('D' if home_goals == away_goals else 'L')
-                    score = f"{away_goals}-{home_goals}"  # Mostrar primero los goles del Atleti
                 
                 cumulative_points += points
                 
@@ -190,7 +227,7 @@ def process_matches(matches):
     
     return pd.DataFrame(data)
 
-def transform_dataframe(df):
+def transform_dataframe(df, team_mapping=None):
     """
     Realiza transformaciones adicionales al DataFrame
     
@@ -210,7 +247,8 @@ def transform_dataframe(df):
     df_new['jornada'] = range(1, len(df_new) + 1)
     
     # Cargar el mapeo real de equipos
-    team_mapping = load_teams_mapping()
+    if team_mapping is None:
+        team_mapping = load_teams_mapping()
     
     # Aplicar el mapeo a los nombres de los oponentes y agregar ruta al escudo
     df_new['opponent_display'] = df_new['opponent'].apply(
@@ -239,6 +277,15 @@ def get_atletico_matches(api_key):
     """
     matches = fetch_matches(api_key)
     if matches:
-        df = process_matches(matches)
-        return transform_dataframe(df)
+        # Cargar el mapeo una sola vez
+        team_mapping = load_teams_mapping()
+        
+        # Mostrar los equipos disponibles en el CSV
+        print("Equipos disponibles en el CSV:")
+        for team in team_mapping.keys():
+            print(f"  - {team}")
+        
+        # Procesar usando el mismo mapeo
+        df = process_matches(matches, team_mapping)
+        return transform_dataframe(df, team_mapping)
     return None

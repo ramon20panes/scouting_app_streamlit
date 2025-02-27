@@ -1,4 +1,3 @@
-# En utils/visualization.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,6 +10,7 @@ from PIL import Image
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
 
+# Definir función para crear un gráfico bumpy chart
 def create_bumpy_chart(df, highlight_teams=None):
     """
     Crea un gráfico bumpy chart para visualizar la evolución de posiciones de equipos en La Liga.
@@ -22,11 +22,11 @@ def create_bumpy_chart(df, highlight_teams=None):
     Returns:
         fig, ax: Figura y ejes de matplotlib
     """
-    # Si no se especifican equipos para destacar, usar algunos por defecto
+    # Equipos por defecto
     if highlight_teams is None or len(highlight_teams) == 0:
         highlight_teams = ["Club Atlético de Madrid", "Real Madrid CF", "FC Barcelona"]
     
-    # Paleta de colores para equipos destacados
+    # Paleta de colores para equipos
     team_colors = {
         "Club Atlético de Madrid": "darkblue",
         "Real Madrid CF": "white",
@@ -50,7 +50,7 @@ def create_bumpy_chart(df, highlight_teams=None):
         "UD Las Palmas": "#FFD700"      
     }
     
-    # Crear un diccionario de colores solo para los equipos seleccionados
+    # Crear un diccionario de colores solo para los equipos
     highlight_dict = {team: team_colors.get(team, "#A0A0A0") for team in highlight_teams}
     
     # Determinar la última jornada con datos diferentes
@@ -74,6 +74,9 @@ def create_bumpy_chart(df, highlight_teams=None):
     
     # Transponer el dataframe para el formato que necesita el gráfico
     df_plot = df_filtered.set_index('Equipo').T
+
+    # Invertir las posiciones para que 1 esté arriba y 20 abajo
+    df_plot = df_plot.applymap(lambda x: 21 - x)  
     
     # Crear las etiquetas de jornadas
     Jornada_labels = ['Jornada ' + str(num) for num in range(1, len(df_plot)+1)]
@@ -92,43 +95,46 @@ def create_bumpy_chart(df, highlight_teams=None):
     )
     
     # Crear el gráfico
-    # En utils/visualization.py, dentro de create_bumpy_chart
     fig, ax = bumpy.plot(
         x_list=Jornada_labels,
         y_list=np.linspace(1, 20, 20).astype(int),
         values=df_plot,
         secondary_alpha=0.3,
         highlight_dict=highlight_dict,
-        figsize=(12, 6),  # Reducido para que ocupe menos espacio
+        figsize=(12, 6),  
         y_label='Posición',
-        ylim=(-.1, 22),
+        x_label='Jornadas',
+        ylim=(20.5, 0.5),
         lw=2
     )
+    # Cambiar el color de la etiqueta 'Posición' a darkblue
+    ax.set_ylabel('Posición', color='darkblue', fontweight='bold')
+    ax.set_xlabel('Jornadas', color='darkblue', fontweight='bold')
 
     # Configurar etiquetas de eje X (jornadas)
     ax.set_xticks(range(len(Jornada_labels)))
-    ax.set_xticklabels([f"J{i+1}" for i in range(len(Jornada_labels))], rotation=90)
+    ax.set_xticklabels([f"J{i+1}" for i in range(len(Jornada_labels))], rotation=90, color="darkblue", weight='bold')
 
     # Configurar etiquetas de eje Y (posiciones)
     ax.set_yticks(range(1, 21))
-    ax.set_yticklabels([str(i) for i in range(1, 21)])
+    ax.set_yticklabels([str(i) for i in range(1, 21)], color="darkblue", weight='bold')
     
     # Configurar estilo del gráfico
     ax.set_facecolor('#d4d4d4')
-    fig.patch.set_facecolor('grey')
+    fig.patch.set_facecolor('#d4d4d4')
     
     # Actualizar título a negro
     fig.text(
         s='Progresión Clasificación LaLiga 24/25',
         x=.5, 
         y=.95,
-        c='black',  # Cambiado a negro
+        c='black',  
         size=18,
         weight='bold',
         ha='center'
     )
     
-    # Texto con equipos (sin "Comparación")
+    # Texto con equipos
     highlight_text_str = ""
     highlight_textprops = []
     
@@ -140,18 +146,17 @@ def create_bumpy_chart(df, highlight_teams=None):
     
     highlight_text.fig_text(
         x=.5, 
-        y=.91,
+        y=.93,
         s=highlight_text_str,
         highlight_textprops=highlight_textprops,
         fontsize=14,
-        color='black',  # Cambiado a negro para coincidir con el título
+        color='black',  
         ha='center'
     )
     
-    # Añadir escudos
-    
-    
-    # Añadir escudo del Atleti
+    # Añadir logos
+        
+    # Escudo del Atleti
     ax2 = fig.add_axes([0.02, 0.92, 0.1, 0.1])
     ax2.axis('off')
     try:
@@ -160,7 +165,7 @@ def create_bumpy_chart(df, highlight_teams=None):
     except Exception as e:
         print(f"No se pudo cargar el escudo del Atleti: {str(e)}")
     
-    # Añadir logo de LaLiga
+    # Logo de LaLiga
     ax3 = fig.add_axes([0.90, 0.92, 0.1, 0.1])
     ax3.axis('off')
     try:
@@ -170,6 +175,9 @@ def create_bumpy_chart(df, highlight_teams=None):
         print(f"No se pudo cargar el logo de LaLiga: {str(e)}")
     
     return fig, ax
+
+# ----------------------------------------------------------------
+# Códigos para el gráfico Timeline de los resultados del atleti en la liga
 
 def get_team_logo(team_name, team_mapping, default_scale=0.08):
     """
@@ -181,46 +189,114 @@ def get_team_logo(team_name, team_mapping, default_scale=0.08):
         default_scale (float): Escala por defecto
     
     Returns:
-        OffsetImage: Imagen del logo escalada
+        OffsetImage: Imagen del logo escalada o None si no se encuentra
     """
-    # Diccionario de escalas personalizadas
+    # Mapeo específico para nombres problemáticos
+    name_mapping = {
+        'Barcelona': 'FC Barcelona',
+        'Leganés': 'CD Leganes',
+        'CD Leganés': 'CD Leganes',
+        'Alavés': 'Deportivo Alaves',
+        'Deportivo Alavés': 'Deportivo Alaves',
+        'Real Madrid CF': 'Real Madrid',
+        'Real Sociedad de Fútbol': 'Real Sociedad',
+        'RCD Espanyol de Barcelona': 'RCD Español',
+        'RCD Espanyol': 'RCD Español',
+        'Espanyol': 'RCD Español',
+        'Las Palmas': 'UD Las Palmas',
+        'Real Valladolid CF': 'Real Valladolid',
+        'Rayo Vallecano de Madrid': 'Rayo Vallecano',
+    }
+    
+    # Buscar en el mapeo de nombres
+    if team_name in name_mapping:
+        team_name = name_mapping[team_name]
+    
+    # Diccionario de escalas personalizadas por equipo
     scales = {
-        'Girona FC': 0.03,
+        'Girona FC': 0.027,
         'Athletic Club': 0.03,
         'Valencia CF': 0.028,
-        'Real Madrid': 0.032,
-        'Real Sociedad': 0.03,
+        'Real Madrid': 0.03,  
+        'Real Sociedad': 0.03,  
         'Real Betis': 0.03,
         'FC Barcelona': 0.027,
-        'Español': 0.052,
+        'RCD Español': 0.052,
         'Villarreal CF': 0.09,
         'Sevilla FC': 0.06,
         'Rayo Vallecano': 0.06,
-        'Celta de Vigo': 0.075,
-        'CD Leganes': 0.09,
-        'Las Palmas': 0.13,
+        'RC Celta de Vigo': 0.075,
+        'CD Leganes': 0.08,
+        'UD Las Palmas': 0.136,
         'RCD Mallorca': 0.14,
         'CA Osasuna': 0.1,
-        'Dptvo. Alaves': 0.1,
+        'Deportivo Alaves': 0.1,
         'Real Valladolid': 0.11,
         'Getafe CF': 0.11,
     }
     
     # Obtener la información del equipo del mapeo
-    team_info = team_mapping.get(team_name, {})
+    team_info = None
+    
+    # Buscar coincidencia exacta primero
+    if team_name in team_mapping:
+        team_info = team_mapping[team_name]
+    else:
+        # Buscar sin considerar mayúsculas/minúsculas
+        for mapped_name, info in team_mapping.items():
+            if mapped_name.lower() == team_name.lower():
+                team_info = info
+                break
+    
+    # Si aún no se encuentra, buscar coincidencias parciales
+    if team_info is None:
+        for mapped_name, info in team_mapping.items():
+            if mapped_name.lower() in team_name.lower() or team_name.lower() in mapped_name.lower():
+                team_info = info
+                break
+    
+    if team_info is None:
+        return None
     
     # Obtener la ruta del logo
     logo_path = team_info.get('logo_path', '')
     
-    # Obtener el zoom, usando el nombre del equipo para buscar en scales
+    # Eliminar comillas simples si existen
+    if logo_path.startswith("'") and logo_path.endswith("'"):
+        logo_path = logo_path[1:-1]
+    
+    # Obtener el zoom
     zoom = scales.get(team_name, default_scale)
     
     try:
-        if logo_path and Path(logo_path).exists():
-            img = plt.imread(logo_path)
-            return OffsetImage(img, zoom=zoom, alpha=1)
+        if logo_path:
+            # Verificar si la ruta es relativa
+            path_obj = Path(logo_path)
+            if not path_obj.is_absolute():
+                # Buscar en diferentes ubicaciones relativas
+                possible_paths = [
+                    path_obj,
+                    Path("assets/escudos") / path_obj.name,
+                    Path("assets") / path_obj,
+                    Path("assets/escudos") / Path(logo_path).name
+                ]
+                
+                for p in possible_paths:
+                    if p.exists():
+                        logo_path = str(p)                        
+                        break
+            
+            if Path(logo_path).exists():
+                img = plt.imread(logo_path)
+                return OffsetImage(img, zoom=zoom, alpha=1)
+            else:
+                print(f"❌ No se pudo encontrar el archivo: {logo_path}")
+        else:
+            print(f"❌ Ruta de logo vacía para {team_name}")
     except Exception as e:
-        print(f"Error al cargar el logo de {team_name}: {e}")
+        
+        import traceback
+        traceback.print_exc()
     
     return None
 
@@ -236,9 +312,9 @@ def create_match_timeline(df, team_mapping):
         fig: Figura de matplotlib
     """
     # Crear figura y ejes explícitamente
-    fig, ax = plt.subplots(figsize=(20, 10), facecolor='#E0E0E0')
-    ax.set_facecolor('#E0E0E0')
-
+    fig, ax = plt.subplots(figsize=(12, 9), facecolor='#d4d4d4')
+    ax.set_facecolor('#d4d4d4')
+    #E0E0E0
     # Configuración de colores y barras
     colors = {'W': 'green', 'D': 'orange', 'L': 'red'}
     bar_width = 0.5
@@ -250,7 +326,7 @@ def create_match_timeline(df, team_mapping):
         
         # Añadir barra roja para derrotas
         if row['result'] == 'L':
-            ax.vlines(x=row['jornada'], ymin=-0.3, ymax=0, color='darkblue', linewidth=8)
+            ax.vlines(x=row['jornada'], ymin=-0.3, ymax=0, color='red', linewidth=8)
 
         y_pos = height + 0.1
         
@@ -258,66 +334,66 @@ def create_match_timeline(df, team_mapping):
         logo = get_team_logo(row['opponent_display'], team_mapping)
         if logo:
             ab = AnnotationBbox(logo, 
-                                (row['jornada'], y_pos),
-                                frameon=False, 
-                                box_alignment=(0.5, 0.5))
+                               (row['jornada'], y_pos),
+                               frameon=False, 
+                               box_alignment=(0.5, 0.5))
             ax.add_artist(ab)
+        else:
+            # Mostrar texto si no hay logo
+            ax.text(row['jornada'], y_pos,
+                   row['opponent_display'].split()[-1],
+                   ha='center', va='center',
+                   fontsize=8, color='black',
+                   bbox=dict(facecolor='white', edgecolor='gray', boxstyle='round,pad=0.2'))
 
         # Para local/visitante
-        ax.text(row['jornada'], -0.5,
-                'L' if row['location'] == 'Local' else 'V',
-                ha='center', va='center',
-                fontsize=10,
-                weight='bold',
-                color='darkblue')
+        ax.text(row['jornada'], -1.05,
+               'L' if row['location'] == 'Local' else 'V',
+               ha='center', va='center',
+               fontsize=10,
+               weight='bold',
+               color='darkblue')
 
         result_color = colors[row['result']]
-        ax.text(row['jornada'], height + 0.4,
-                row['score'],
-                ha='center',
-                va='bottom',
-                fontsize=10,
-                weight='bold',
-                color=result_color)
+        ax.text(row['jornada'], height + 0.6,
+               row['score'],
+               ha='center',
+               va='bottom',
+               fontsize=10,
+               weight='bold',
+               color=result_color)
         
         # Añadir fecha del partido
-        ax.text(row['jornada'], -0.8,
-                row['date'],
-                ha='center',
-                va='center',
-                fontsize=8,
-                color='darkblue')
+        ax.text(row['jornada'], -2,
+               row['date'],
+               ha='center',
+               va='center',
+               fontsize=8,
+               weight='bold',
+               color='darkblue',
+               rotation=60)
 
     # Configuraciones adicionales del gráfico
     # Eliminar spines
     for spine in ax.spines.values():
         spine.set_visible(False)
 
-    # Configurar eje Y
+    # Configurar eje Y - quitar las marcas
     ax.set_yticks([0, 1, 3])
-    ax.set_yticklabels(['0', '1', '3'], color='white')
-    ax.tick_params(axis='y', colors='white')
+    ax.set_yticklabels(['0', '1', '3'])  # Etiquetas vacías para quitar los números
+    ax.tick_params(axis='y', colors='darkblue', size=0)
 
-    # Configurar eje X
-    ax.set_xlabel('Jornada y Fecha', color='white', fontsize=12)
-    ax.tick_params(axis='x', colors='white')
+    # Ajustar eje X para mostrar solo jornadas del 1 al 25
+    ax.set_xticks(range(1, 26))
+    ax.set_xticklabels(range(1, 26), color='darkblue')
+    ax.tick_params(axis='x', colors='darkblue', size=0)
 
     # Título personalizado
-    plt.title('Timeline de Partidos del Atlético de Madrid', 
-              color='white', 
-              fontsize=16, 
-              fontweight='bold', 
-              pad=20)
-
-    # Añadir texto adicional
-    plt.text(0.5, 1.05, 
-             'Rendimiento en LaLiga 2024/25', 
-             horizontalalignment='center',
-             verticalalignment='center',
-             transform=ax.transAxes,
-             color='white',
-             fontsize=12,
-             fontweight='light')
+    plt.title('Atlético de Madrid 24/25', 
+             color='darkblue', 
+             fontsize=18, 
+             fontweight='bold', 
+             pad=65)  # Aumentar el pad para subir el título
 
     # Calcular estadísticas
     total_matches = len(df)
@@ -333,14 +409,13 @@ def create_match_timeline(df, team_mapping):
         f"Victorias: {wins} | Empates: {draws} | Derrotas: {losses}"
     )
 
-    plt.text(0.5, -0.15, 
+    plt.text(0.9, 1.4, 
              stats_text, 
              horizontalalignment='center',
              verticalalignment='center',
              transform=ax.transAxes,
-             color='white',
-             fontsize=10,
-             bbox=dict(facecolor='#3a3a3a', edgecolor='none', alpha=0.7, pad=10))
+             color='darkblue',
+             fontsize=12)
 
     plt.tight_layout()
     
