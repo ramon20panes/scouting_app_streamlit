@@ -214,25 +214,25 @@ def get_team_logo(team_name, team_mapping, default_scale=0.08):
     
     # Diccionario de escalas personalizadas por equipo
     scales = {
-        'Girona FC': 0.027,
+        'Girona FC': 0.024,
         'Athletic Club': 0.03,
         'Valencia CF': 0.028,
-        'Real Madrid': 0.03,  
-        'Real Sociedad': 0.03,  
-        'Real Betis': 0.03,
-        'FC Barcelona': 0.027,
-        'RCD Español': 0.052,
-        'Villarreal CF': 0.09,
-        'Sevilla FC': 0.06,
+        'Real Madrid': 0.027,  
+        'Real Sociedad': 0.027,  
+        'Real Betis': 0.027,
+        'FC Barcelona': 0.022,
+        'RCD Español': 0.047,
+        'Villarreal CF': 0.08,
+        'Sevilla FC': 0.053,
         'Rayo Vallecano': 0.06,
         'RC Celta de Vigo': 0.075,
-        'CD Leganes': 0.08,
-        'UD Las Palmas': 0.136,
-        'RCD Mallorca': 0.14,
-        'CA Osasuna': 0.1,
-        'Deportivo Alaves': 0.1,
-        'Real Valladolid': 0.11,
-        'Getafe CF': 0.11,
+        'CD Leganes': 0.07,
+        'UD Las Palmas': 0.118,
+        'RCD Mallorca': 0.12,
+        'CA Osasuna': 0.095,
+        'Deportivo Alaves': 0.09,
+        'Real Valladolid': 0.095,
+        'Getafe CF': 0.099,
     }
     
     # Obtener la información del equipo del mapeo
@@ -384,8 +384,8 @@ def create_match_timeline(df_tm, team_mapping):
     ax.tick_params(axis='y', colors='darkblue', size=0)
 
     # Ajustar eje X para mostrar solo jornadas del 1 al 25
-    ax.set_xticks(range(1, 26))
-    ax.set_xticklabels(range(1, 26), color='darkblue')
+    ax.set_xticks(range(1, 27))
+    ax.set_xticklabels(range(1, 27), color='darkblue', size=8, weight='bold') 
     ax.tick_params(axis='x', colors='darkblue', size=0)
 
     # Título personalizado

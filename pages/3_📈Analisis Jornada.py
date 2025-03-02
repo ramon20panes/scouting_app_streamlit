@@ -12,9 +12,9 @@ from common.pdf_export import export_to_pdf, download_pdf_button
 from utils.styles import load_all_styles
 
 from data.jornada_data.url_mapeo import load_partidos_master, load_equipos_master
-from data.jornada_data.csv_lectura import load_match_stats
+from data.jornada_data.csv_lectura import load_match_stats, load_partido_stats
 from data.jornada_data.func_escraper import get_passing_network, get_xg_data, get_match_momentum, get_shot_map
-from utils.visualization_2 import plot_team_metrics, plot_passing_network, plot_xg_comparison, plot_match_momentum, plot_shot_map
+from utils.visualization_2 import plot_team_metrics # plot_passing_network, plot_xg_comparison, plot_match_momentum, plot_shot_map
 
 # Configuración de la página
 st.set_page_config(
@@ -106,161 +106,213 @@ if not st.session_state.page_history or st.session_state.page_history[-1] != cur
 
 # CONTENIDO ESPECÍFICO DE LA PÁGINA - ANÁLISIS POR JORNADA
 def main():
-    # Cargar datos maestros
+    # 1. Cargar datos maestros
     try:
         partidos_df = load_partidos_master()
         equipos_df = load_equipos_master()
-
-        if partidos_df.empty:
-            st.error("No se pudieron cargar los datos de partidos")
-        else:
-            # Mostrar las columnas disponibles para diagnóstico
-            st.write("Columnas disponibles:", partidos_df.columns.tolist())
-    
-            # Usar el nombre de columna correcto para el selector de jornada
-            column_to_use = None
-            for possible_column in ['formato_jornada', 'Formato_jornada', 'formato jornada', 'Jornada']:
-                if possible_column in partidos_df.columns:
-                    column_to_use = possible_column
-                    break
-    
-            if column_to_use:
-                jornadas = partidos_df[column_to_use].tolist()
-                selected_jornada = st.selectbox(
-                    "Selecciona una jornada:", 
-                    jornadas,
-                    format_func=lambda x: x
-                )
+        
+        if partidos_df.empty or equipos_df.empty:
+            st.error("No se pudieron cargar los datos maestros")
+            return
+            
+        # 2. Selector de jornada simplificado
+        jornadas = partidos_df['formato_jornada'].tolist()
+        selected_jornada = st.selectbox("Selecciona una jornada:", jornadas)
+        
+        # 3. Obtener datos del partido
+        partido_row = partidos_df[partidos_df['formato_jornada'] == selected_jornada]
+        if partido_row.empty:
+            st.error(f"No se encontró información para la jornada: {selected_jornada}")
+            return
+            
+        partido_data = partido_row.iloc[0]
+        
+        # 4. Mostrar información básica del partido
+        jornada_num = partido_data['Jornada']
+        equipo_local = partido_data['equipo_local']
+        equipo_visitante = partido_data['equipo_visitante']
+        
+        st.write(f"Jornada: {jornada_num}")
+        st.write(f"Partido: {equipo_local} vs {equipo_visitante}")
+        
+        # 5. Buscar información de equipos para los escudos
+        local_row = equipos_df[equipos_df['nombre'].str.strip() == equipo_local.strip()]
+        visitante_row = equipos_df[equipos_df['nombre'].str.strip() == equipo_visitante.strip()]
+        
+        local_info = None
+        visitante_info = None
+        
+        if not local_row.empty:
+            local_info = local_row.iloc[0].to_dict()
+            # Corregir la clave para ruta_escudo si tiene espacios extra
+            if ' ruta_escudo' in local_info:
+                local_info['ruta_escudo'] = local_info[' ruta_escudo'].strip("'")
+            
+        if not visitante_row.empty:
+            visitante_info = visitante_row.iloc[0].to_dict()
+            # Corregir la clave para ruta_escudo si tiene espacios extra
+            if ' ruta_escudo' in visitante_info:
+                visitante_info['ruta_escudo'] = visitante_info[' ruta_escudo'].strip("'")
                 
-                # 2. Obtener datos del partido seleccionado
-                partido_data = partidos_df[partidos_df[column_to_use] == selected_jornada].iloc[0]
-    
-                # Este es el código de diagnóstico que debes insertar:
-                equipo_local = partido_data['equipo_local']
-                equipo_visitante = partido_data['equipo_visitante']
-
-                st.write(f"Buscando equipos: '{equipo_local}' y '{equipo_visitante}'")
-
-                # Veamos si los nombres de equipo coinciden exactamente
-                if 'nombre' in equipos_df.columns:
-                    equipos_nombres = equipos_df['nombre'].tolist()
-                    st.write(f"Valores en columna 'nombre': {equipos_nombres}")
-    
-                    # Verificar si los equipos existen exactamente
-                    if equipo_local in equipos_nombres:
-                        local_info = equipos_df[equipos_df['nombre'] == equipo_local].iloc[0].to_dict()
-                    else:
-                        st.error(f"No se encontró el equipo local '{equipo_local}' exactamente en la lista de nombres")
-                        # Buscar coincidencias parciales
-                        matches = [e for e in equipos_nombres if equipo_local in e or e in equipo_local]
-                        if matches:
-                            st.write(f"Posibles coincidencias: {matches}")
-                            local_info = equipos_df[equipos_df['nombre'] == matches[0]].iloc[0].to_dict()
-                        else:
-                            local_info = None
-    
-                    if equipo_visitante in equipos_nombres:
-                        visitante_info = equipos_df[equipos_df['nombre'] == equipo_visitante].iloc[0].to_dict()
-                    else:
-                        st.error(f"No se encontró el equipo visitante '{equipo_visitante}' exactamente en la lista de nombres")
-                        # Buscar coincidencias parciales
-                        matches = [e for e in equipos_nombres if equipo_visitante in e or e in equipo_visitante]
-                        if matches:
-                            st.write(f"Posibles coincidencias: {matches}")
-                            visitante_info = equipos_df[equipos_df['nombre'] == matches[0]].iloc[0].to_dict()
-                        else:
-                            visitante_info = None
+        # 7. Cargar estadísticas del partido
+        partido_str = f"{equipo_local}-{equipo_visitante}"
+        
+        # Cargar estadísticas usando nuestra función mejorada
+        match_stats = load_match_stats(jornada=jornada_num, partido=partido_str)
+        
+        if match_stats is not None and not match_stats.empty:
+            # Mostrar tabla de estadísticas si tenemos datos válidos
+            if local_info and visitante_info:
+                # Usar tu función plot_team_metrics para mostrar la tabla
+                plot_team_metrics(match_stats, local_info, visitante_info)
             else:
-                st.error("No se encontró la columna 'nombre' en el DataFrame de equipos")
-                st.write("Columnas disponibles:", equipos_df.columns.tolist())
-                local_info = None
-                visitante_info = None
-                
-                # 4. Sección de visualizaciones adicionales
-                st.header("Visualizaciones avanzadas")
-                
-                    # Crear opciones de visualización como botones o selectbox
-                visualization_options = [
-                    "Redes de pases", 
-                    "Expected Goals (xG)", 
-                    "Dinámica del partido", 
-                    "Mapas de tiros"
-                ]
-                
-                selected_viz = st.radio(
-                    "Selecciona una visualización:",
-                    visualization_options,
-                    horizontal=True
-                )
-                
-                # Contenedor para la visualización seleccionada
-                viz_container = st.container()
-                
-                with viz_container:
-                    if selected_viz == "Redes de pases":
-                        # El resto del código para visualizaciones...
-                        with st.spinner("Cargando datos de pases..."):
-                            try:
-                                # Función de caché para redes de pases
-                                @st.cache_data(ttl=3600)
-                                def get_cached_passing_network(partido_data):
-                                    match_id = partido_data.get('id_whoscored')  # O el ID que uses para esta visualización
-                                    return get_passing_network(match_id)
-                                
-                                passing_data = get_cached_passing_network(partido_data)
-                                
-                                if passing_data:
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        st.subheader(f"{local_info['nombre']} - Red de pases")
-                                        local_network_fig = plot_passing_network(
-                                            passing_data['local'], 
-                                            local_info['nombre']
-                                        )
-                                        st.pyplot(local_network_fig)
-                                    
-                                    with col2:
-                                        st.subheader(f"{visitante_info['nombre']} - Red de pases")
-                                        visitante_network_fig = plot_passing_network(
-                                            passing_data['visitante'], 
-                                            visitante_info['nombre']
-                                        )
-                                        st.pyplot(visitante_network_fig)
-                                else:
-                                    st.warning("No se pudieron obtener datos de pases para este partido.")
-                            except Exception as e:
-                                st.error(f"Error al cargar redes de pases: {str(e)}")
+                st.warning("No se pudo mostrar la tabla de estadísticas porque falta información de los equipos")
+        else:
+            st.warning(f"No se encontraron estadísticas para el partido: {partido_str}")
+        
+        # 8. SECCIÓN DE VISUALIZACIONES - USANDO TABS
+        st.header("Visualizaciones avanzadas")
+        
+        # Crear opciones de visualización como pestañas
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "Redes de pases", 
+            "Expected Goals (xG)", 
+            "Dinámica del partido", 
+            "Mapas de tiros"
+        ])
+        
+        # En cada pestaña, colocamos la visualización correspondiente
+        with tab1:
+            st.subheader("Redes de pases")
+            st.info("Visualización de Redes de Pase próximamente")
+            """
+            with st.spinner("Cargando datos de pases..."):
+                try:
+                    # Función de caché para redes de pases
+                    @st.cache_data(ttl=3600)
+                    def get_cached_passing_network(id_whoscored):
+                        return get_passing_network(id_whoscored)
                     
-                    elif selected_viz == "Expected Goals (xG)":
-                        with st.spinner("Cargando datos de xG..."):
-                            try:
-                                # Similar al código anterior para xG
-                                # ...
-                                st.info("Visualización de Expected Goals en desarrollo")
-                            except Exception as e:
-                                st.error(f"Error al cargar datos de xG: {str(e)}")
-                    
-                    elif selected_viz == "Dinámica del partido":
-                        with st.spinner("Cargando datos de momentum..."):
-                            try:
-                                # Similar al código anterior para momentum
-                                # ...
-                                st.info("Visualización de dinámica de partido en desarrollo")
-                            except Exception as e:
-                                st.error(f"Error al cargar datos de dinámica: {str(e)}")
-                    
-                    elif selected_viz == "Mapas de tiros":
-                        with st.spinner("Cargando mapas de tiros..."):
-                            try:
-                                # Similar al código anterior para mapas de tiros
-                                # ...
-                                st.info("Visualización de mapas de tiros en desarrollo")
-                            except Exception as e:
-                                st.error(f"Error al cargar mapas de tiros: {str(e)}")
+                    # Usar el ID de whoscored del partido
+                    id_whoscored = partido_data.get('id_whoscored')
+                    if id_whoscored:
+                        passing_data = get_cached_passing_network(id_whoscored)
+                        
+                        if passing_data and local_info and visitante_info:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write(f"{equipo_local} - Red de pases")
+                                local_network_fig = plot_passing_network(
+                                    passing_data['local'], 
+                                    equipo_local
+                                )
+                                st.pyplot(local_network_fig)
+                            
+                            with col2:
+                                st.write(f"{equipo_visitante} - Red de pases")
+                                visitante_network_fig = plot_passing_network(
+                                    passing_data['visitante'], 
+                                    equipo_visitante
+                                )
+                                st.pyplot(visitante_network_fig)
+                        else:
+                            st.info("Datos de red de pases no disponibles para este partido")
                     else:
-                        st.error("No se encontró una columna adecuada para las jornadas")
+                        st.info("No se encontró ID de WhoScored para este partido")
+                except Exception as e:
+                    st.error(f"Error al cargar redes de pases: {str(e)}")
+            """
+        
+        with tab2:
+            st.subheader("Expected Goals (xG)")
+            st.info("Visualización Xg próximamente")
+            """
+            with st.spinner("Cargando datos de xG..."):
+                try:
+                    # Función de caché para xG
+                    @st.cache_data(ttl=3600)
+                    def get_cached_xg_data(id_understat):
+                        return get_xg_data(id_understat)
+                    
+                    id_understat = partido_data.get('id_understat')
+                    if id_understat:
+                        xg_data = get_cached_xg_data(id_understat)
+                        
+                        if xg_data and local_info and visitante_info:
+                            fig = plot_xg_comparison(xg_data, local_info, visitante_info)
+                            st.pyplot(fig)
+                        else:
+                            st.info("Datos de xG no disponibles para este partido")
+                    else:
+                        st.info("No se encontró ID de Understat para este partido")
+                except Exception as e:
+                    st.error(f"Error al cargar datos de xG: {str(e)}")
+        """
+        
+        with tab3:
+            st.subheader("Dinámica del partido")
+            st.info("Visualización Match Momentum próximamente")
+            """""
+            with st.spinner("Cargando datos de momentum..."):
+                try:
+                    # Función de caché para momentum
+                    @st.cache_data(ttl=3600)
+                    def get_cached_momentum(id_fotmob):
+                        return get_match_momentum(id_fotmob)
+                    
+                    id_fotmob = partido_data.get('id_fotmob')
+                    if id_fotmob:
+                        momentum_data = get_cached_momentum(id_fotmob)
+                        
+                        if momentum_data:
+                            fig = plot_match_momentum(momentum_data, equipo_local, equipo_visitante)
+                            st.pyplot(fig)
+                        else:
+                            st.info("Datos de dinámica no disponibles para este partido")
+                    else:
+                        st.info("No se encontró ID de Fotmob para este partido")
+                except Exception as e:
+                    st.error(f"Error al cargar datos de dinámica: {str(e)}")
+        """
+        
+        with tab4:
+            st.subheader("Mapas de tiros")
+            st.info("Visualización Mapas de Tiros próximamente")
+            """
+            with st.spinner("Cargando datos de tiros..."):
+                try:
+                    # Función de caché para mapas de tiros
+                    @st.cache_data(ttl=3600)
+                    def get_cached_shots(id_understat):
+                        return get_shot_map(id_understat)
+                    
+                    id_understat = partido_data.get('id_understat')
+                    if id_understat:
+                        shots_data = get_cached_shots(id_understat)
+                        
+                        if shots_data and local_info and visitante_info:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write(f"{equipo_local} - Mapa de tiros")
+                                local_shots_fig = plot_shot_map(shots_data['local'], equipo_local)
+                                st.pyplot(local_shots_fig)
+                            
+                            with col2:
+                                st.write(f"{equipo_visitante} - Mapa de tiros")
+                                visitante_shots_fig = plot_shot_map(shots_data['visitante'], equipo_visitante)
+                                st.pyplot(visitante_shots_fig)
+                        else:
+                            st.info("Datos de tiros no disponibles para este partido")
+                    else:
+                        st.info("No se encontró ID de Understat para este partido")
+                except Exception as e:
+                    st.error(f"Error al cargar mapas de tiros: {str(e)}")
+        """
+    
     except Exception as e:
         st.error(f"Error general: {str(e)}")
+        import traceback
+        st.write(traceback.format_exc())
 
 # Ejecutar la función principal
 main()
