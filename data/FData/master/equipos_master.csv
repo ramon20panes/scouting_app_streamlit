@@ -1,4 +1,4 @@
-﻿nombre; shortname; id_streamlit; id_fbref; id_whoscored; id_fotmob; id_understat;id_sofascore; ruta_escudo
+﻿nombre; shortname; id_streamlit; id_fbref;id_whoscored; id_fotmob; id_understat;id_sofascore; ruta_escudo
 Deportivo Alaves;ALA;1;https://fbref.com/es/equipos/8d6fd021/Estadisticas-de-Alaves;60;9866;https://understat.com/team/Alaves/2024;2885;'assets/escudos/ala.png'
 Atletico de Madrid;ATM;2;https://fbref.com/es/equipos/db3b9613/Estadisticas-de-Atletico-Madrid;63;9906;https://understat.com/team/Atletico_Madrid/2024;2836;'assets/escudos/atm.png'
 Athletic Club;ATH;3;https://fbref.com/es/equipos/2b390eca/Estadisticas-de-Athletic-Club;53;8315;https://understat.com/team/Athletic_Club/2024;2825;'assets/escudos/ath.png'

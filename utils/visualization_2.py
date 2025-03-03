@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import seaborn as sns
-from data.jornada_data.csv_lectura import normalize_team_name  # Ajusta la ruta según tu estructura de directorios
+from data.jornada_data.csv_lectura import normalize_team_name   # Ajusta la ruta según tu estructura de directorios
 from PIL import Image
 import io
 import traceback
@@ -166,6 +166,7 @@ def plot_team_metrics(match_stats, local_info, visitante_info):
 # - - - - - - - - -
 # Función red de pases
 
+
 # Colores globales
 green = '#2d9900'
 red = '#e60000'
@@ -175,28 +176,30 @@ line_color = '#000000'
 atleti_color = '#172790'
 rival_color = '#e60000'
 
-def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df, col, teamName, 
-                               passes_df=None, hteamName=None, ateamName=None):
-    MAX_LINE_WIDTH = 15
-    MAX_MARKER_SIZE = 3000
-    passes_between_df['width'] = (passes_between_df.pass_count / passes_between_df.pass_count.max() * MAX_LINE_WIDTH)
-    
-    MIN_TRANSPARENCY = 0.05
-    MAX_TRANSPARENCY = 0.85
-    color = np.array(to_rgba(col))
-    color = np.tile(color, (len(passes_between_df), 1))
-    c_transparency = passes_between_df.pass_count / passes_between_df.pass_count.max()
-    c_transparency = (c_transparency * (MAX_TRANSPARENCY - MIN_TRANSPARENCY)) + MIN_TRANSPARENCY
-    color[:, 3] = c_transparency
-
+def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df, teamName, 
+                               passes_df=None, home_team=None, away_team=None, team_color=None):
+    # Definir colores base
     atleti_color = '#172790'  # Azul oscuro para el Atlético de Madrid
     rival_color = '#e60000'   # Rojo para el equipo rival
     bg_color = '#E6E6E6'      # Gris mediano para el fondo del campo
     line_color = '#001F3F'    # Azul oscuro para las líneas y textos
 
+    # Determinar si es el equipo local o visitante
+    is_home_team = teamName == home_team
+
+    MAX_LINE_WIDTH = 15
+    passes_between_df['width'] = (passes_between_df.pass_count / passes_between_df.pass_count.max() * MAX_LINE_WIDTH)
+    
+    MIN_TRANSPARENCY = 0.05
+    MAX_TRANSPARENCY = 0.85
+    color = np.array(to_rgba(team_color))
+    color = np.tile(color, (len(passes_between_df), 1))
+    c_transparency = passes_between_df.pass_count / passes_between_df.pass_count.max()
+    c_transparency = (c_transparency * (MAX_TRANSPARENCY - MIN_TRANSPARENCY)) + MIN_TRANSPARENCY
+    color[:, 3] = c_transparency
+
     pitch = Pitch(pitch_type='uefa', corner_arcs=True, pitch_color=bg_color, line_color=line_color, linewidth=2)
     pitch.draw(ax=ax)
-    ax.set_xlim(-0.5, 105.5)
 
     # Plot de las líneas
     pitch.lines(passes_between_df.pass_avg_x, passes_between_df.pass_avg_y, 
@@ -215,8 +218,8 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     # Plot de los nombres
     for index, row in average_locs_and_count_df.iterrows():
         player_name = row["name"].split()[-1]
-        pitch.annotate(player_name, xy=(row.pass_avg_x, row.pass_avg_y), c=col, 
-                       ha='center', va='center', size=8, weight='bold', ax=ax)
+        pitch.annotate(player_name, xy=(row.pass_avg_x, row.pass_avg_y), c=team_color, 
+                       ha='center', va='center', size=9, weight='bold', ax=ax)
 
     # Linea que marca la altura media de los pases
     avgph = round(average_locs_and_count_df['pass_avg_x'].median(), 2)
@@ -237,7 +240,7 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     # Color de la zona media de posiciones del equipo
     ymid = [0, 0, 68, 68]
     xmid = [def_line_h, fwd_line_h, fwd_line_h, def_line_h]
-    ax.fill(xmid, ymid, col, alpha=0.1)
+    ax.fill(xmid, ymid, team_color, alpha=0.1)
 
     # Verticalidad de los equipos
     if passes_df is not None:
@@ -259,23 +262,20 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     most_pass_count = passes_between_df_sorted['pass_count'].iloc[0] if not passes_between_df_sorted.empty else 0
     
     # Cabecera y otros textos
-    if teamName == ateamName:
+    if is_home_team:
+        
+        ax.text(avgph-1, -5, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='right')
+        ax.text(105, -5, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='right')
+        ax.text(2, 66, "Círculo = Tit\nCuadrado = Sup", color=team_color, size=12, ha='left', va='top')
+        ax.set_title(f"{home_team}", color=line_color, size=25, fontweight='bold')
+    else:
         # Invierte el campo para el visitante
         ax.invert_xaxis()
         ax.invert_yaxis()
         ax.text(avgph-1, 73, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='left')
         ax.text(105, 73, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='left')
-    else:
-        ax.text(avgph-1, -5, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='right')
-        ax.text(105, -5, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='right')
-
-    # Otros textos
-    if teamName == hteamName:
-        ax.text(2, 66, "Círculo = Tit\nCuadrado = Sup", color=col, size=12, ha='left', va='top')
-        ax.set_title(f"{teamName}\nRed de pases", color=line_color, size=25, fontweight='bold')
-    else:
-        ax.text(2, 2, "Círculo = Tit\nCuadrado = Sup", color=col, size=12, ha='right', va='top')
-        ax.set_title(f"{teamName}\nRed de pases", color=line_color, size=25, fontweight='bold')
+        ax.text(2, 2, "Círculo = Tit\nCuadrado = Sup", color=team_color, size=12, ha='right', va='top')
+        ax.set_title(f"{away_team}", color=line_color, size=25, fontweight='bold')
 
     # Devuelve las estadísticas 
     return {
@@ -286,6 +286,8 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
         'Most_pass_combination_to': most_pass_to,
         'Most_passes_in_combination': most_pass_count,
     }
+
+    
 
 # ----------------------------------------------------------------
 # Función visualización xG comparación

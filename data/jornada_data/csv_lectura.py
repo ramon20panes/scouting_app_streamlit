@@ -6,6 +6,9 @@ from unidecode import unidecode
 import json
 import traceback
 
+
+# Extracción estadísticas para tabla de jornadas
+
 def normalize_team_name(name):
     """Normaliza nombres de equipos para comparación"""
     replacements = {
@@ -381,7 +384,7 @@ def get_possession_chains(events_df, chain_check, suc_evts_in_chain):
 
     return events_out
 
-def process_whoscored_event_data(events_file, players_file):
+def process_whoscored_event_data(events_file, players_file, teams_file):
     """
     Procesa los datos de eventos y jugadores de WhoScored
     
@@ -395,6 +398,21 @@ def process_whoscored_event_data(events_file, players_file):
     # Cargar DataFrames
     df = pd.read_csv(events_file)
     dfp = pd.read_csv(players_file)
+    dft = pd.read_csv(teams_file, sep=';')
+
+    # Mapeo de IDs de equipos a nombres
+    team_id_to_name = dict(zip(dft['id_whoscored'], dft['nombre']))
+    
+    # Determinar equipo local y visitante
+    home_team_id = dfp['teamId'].mode().iloc[0]  # El teamId más frecuente entre los primeros jugadores
+    home_team_name = team_id_to_name[home_team_id]
+
+    # Identificar el equipo visitante como el otro equipo presente
+    away_team_id = dfp[dfp['teamId'] != home_team_id]['teamId'].mode().iloc[0]
+    away_team_name = team_id_to_name[away_team_id]
+    
+    # Obtener nombres de equipos
+    teams_dict = {home_team_id: home_team_name, away_team_id: away_team_name}
     
     # Procesar tipos de eventos y periodos
     df['type'] = df['type'].str.extract(r"'displayName': '([^']+)")
@@ -471,7 +489,7 @@ def process_whoscored_event_data(events_file, players_file):
     df = df[df['period'] != 'PenaltyShootout']
     df = df.reset_index(drop=True)
     
-    return df, dfp, teams_dict
+    return df, dfp, teams_dict, home_team_name, away_team_name
 
 def get_short_name(full_name):
     """
