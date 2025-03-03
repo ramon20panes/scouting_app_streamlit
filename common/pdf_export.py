@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import base64
-from fpdf import FPDF
+from fpdf import FPDF # type: ignore
 import tempfile
 import os
 from datetime import datetime
@@ -20,7 +20,7 @@ def export_to_pdf(data_dict, filename="informe_atletico.pdf", title="Informe Atl
         bytes: PDF en formato de bytes
     """
     try:
-        # Crear PDF
+        
         pdf = FPDF()
         pdf.add_page()
         

@@ -1,6 +1,10 @@
 import pandas as pd
+import numpy as np  
 import os
 from pathlib import Path
+from unidecode import unidecode
+import json
+import traceback
 
 def normalize_team_name(name):
     """Normaliza nombres de equipos para comparación"""
@@ -177,3 +181,376 @@ def load_partido_stats(jornada, partido):
     except Exception as e:
         print(f"Error al cargar estadísticas del partido: {str(e)}")
         return None
+    
+# ----------------------------------------------------------------
+# Función adaptación csv para red de pases
+
+def cumulative_match_mins(events_df):
+    events_out = pd.DataFrame()
+    # Tiempo acumulado para los eventos
+    match_events = events_df.copy()
+    match_events['cumulative_mins'] = match_events['minute'] + (1/60) * match_events['second']
+    # Según periodo de juego
+    for period in np.arange(1, match_events['period'].max() + 1, 1):
+        if period > 1:
+            t_delta = match_events[match_events['period'] == period - 1]['cumulative_mins'].max() - \
+                                   match_events[match_events['period'] == period]['cumulative_mins'].min()
+        elif period == 1 or period == 5:
+            t_delta = 0
+        else:
+            t_delta = 0
+        match_events.loc[match_events['period'] == period, 'cumulative_mins'] += t_delta
+    # Se reconstruye el DF
+    events_out = pd.concat([events_out, match_events])
+    return events_out
+
+def insert_ball_carries(events_df, min_carry_length=3, max_carry_length=60, min_carry_duration=1, max_carry_duration=10):
+    events_out = pd.DataFrame()
+    # Conversión según opta
+    min_carry_length = 3.0
+    max_carry_length = 60.0
+    min_carry_duration = 1.0
+    max_carry_duration = 10.0
+
+    match_events = events_df.reset_index()
+    match_carries = pd.DataFrame()
+    
+    for idx, match_event in match_events.iterrows():
+
+        if idx < len(match_events) - 1:
+            prev_evt_team = match_event['teamId']
+            next_evt_idx = idx + 1
+            init_next_evt = match_events.loc[next_evt_idx]
+            take_ons = 0
+            incorrect_next_evt = True
+
+            while incorrect_next_evt:
+
+                next_evt = match_events.loc[next_evt_idx]
+
+                if next_evt['type'] == 'TakeOn' and next_evt['outcomeType'] == 'Successful':
+                    take_ons += 1
+                    incorrect_next_evt = True
+
+                elif ((next_evt['type'] == 'TakeOn' and next_evt['outcomeType'] == 'Unsuccessful')
+                      or (next_evt['teamId'] != prev_evt_team and next_evt['type'] == 'Challenge' and next_evt['outcomeType'] == 'Unsuccessful')
+                      or (next_evt['type'] == 'Foul')):
+                    incorrect_next_evt = True
+
+                else:
+                    incorrect_next_evt = False
+
+                next_evt_idx += 1
+
+            # Condicionantes por ver si se cumplen
+            same_team = prev_evt_team == next_evt['teamId']
+            not_ball_touch = match_event['type'] != 'BallTouch'
+            dx = 105*(match_event['endX'] - next_evt['x'])/100
+            dy = 68*(match_event['endY'] - next_evt['y'])/100
+            far_enough = dx ** 2 + dy ** 2 >= min_carry_length ** 2
+            not_too_far = dx ** 2 + dy ** 2 <= max_carry_length ** 2
+            dt = 60 * (next_evt['cumulative_mins'] - match_event['cumulative_mins'])
+            min_time = dt >= min_carry_duration
+            same_phase = dt < max_carry_duration
+            same_period = match_event['period'] == next_evt['period']
+
+            valid_carry = same_team & not_ball_touch & far_enough & not_too_far & min_time & same_phase &same_period
+
+            if valid_carry:
+                carry = pd.DataFrame()
+                prev = match_event
+                nex = next_evt
+
+                carry.loc[0, 'eventId'] = prev['eventId'] + 0.5
+                carry['minute'] = np.floor(((init_next_evt['minute'] * 60 + init_next_evt['second']) + (
+                        prev['minute'] * 60 + prev['second'])) / (2 * 60))
+                carry['second'] = (((init_next_evt['minute'] * 60 + init_next_evt['second']) +
+                                    (prev['minute'] * 60 + prev['second'])) / 2) - (carry['minute'] * 60)
+                carry['teamId'] = nex['teamId']
+                carry['x'] = prev['endX']
+                carry['y'] = prev['endY']
+                carry['expandedMinute'] = np.floor(((init_next_evt['expandedMinute'] * 60 + init_next_evt['second']) +
+                                                    (prev['expandedMinute'] * 60 + prev['second'])) / (2 * 60))
+                carry['period'] = nex['period']
+                carry['type'] = carry.apply(lambda x: {'value': 99, 'displayName': 'Carry'}, axis=1)
+                carry['outcomeType'] = 'Successful'
+                carry['qualifiers'] = carry.apply(lambda x: {'type': {'value': 999, 'displayName': 'takeOns'}, 'value': str(take_ons)}, axis=1)
+                carry['satisfiedEventsTypes'] = carry.apply(lambda x: [], axis=1)
+                carry['isTouch'] = True
+                carry['playerId'] = nex['playerId']
+                carry['endX'] = nex['x']
+                carry['endY'] = nex['y']
+                carry['blockedX'] = np.nan
+                carry['blockedY'] = np.nan
+                carry['goalMouthZ'] = np.nan
+                carry['goalMouthY'] = np.nan
+                carry['isShot'] = np.nan
+                carry['relatedEventId'] = nex['eventId']
+                carry['relatedPlayerId'] = np.nan
+                carry['isGoal'] = np.nan
+                carry['cardType'] = np.nan
+                carry['isOwnGoal'] = np.nan
+                carry['type'] = 'Carry'
+                carry['cumulative_mins'] = (prev['cumulative_mins'] + init_next_evt['cumulative_mins']) / 2
+
+                match_carries = pd.concat([match_carries, carry], ignore_index=True, sort=False)
+
+    match_events_and_carries = pd.concat([match_carries, match_events], ignore_index=True, sort=False)
+    match_events_and_carries = match_events_and_carries.sort_values(['period', 'cumulative_mins']).reset_index(drop=True)
+
+    # Se reconstruye el DF
+    events_out = pd.concat([events_out, match_events_and_carries])
+
+    return events_out
+
+def get_possession_chains(events_df, chain_check, suc_evts_in_chain):
+    # Se inicia el output
+    events_out = pd.DataFrame()
+    match_events_df = events_df.reset_index()
+
+    # Aislar eventos válidos de la posesión
+    match_pos_events_df = match_events_df[~match_events_df['type'].isin(['OffsideGiven', 'CornerAwarded','Start', 'Card', 'SubstitutionOff',
+                                                                                  'SubstitutionOn', 'FormationChange','FormationSet', 'End'])].copy()
+
+    # Agregar resultados binarios temporales e identificadores de equipo
+    match_pos_events_df['outcomeBinary'] = (match_pos_events_df['outcomeType']
+                                                .apply(lambda x: 1 if x == 'Successful' else 0))
+    match_pos_events_df['teamBinary'] = (match_pos_events_df['teamName']
+                         .apply(lambda x: 1 if x == min(match_pos_events_df['teamName']) else 0))
+    match_pos_events_df['goalBinary'] = ((match_pos_events_df['type'] == 'Goal')
+                         .astype(int).diff(periods=1).apply(lambda x: 1 if x < 0 else 0))
+
+    # Crear un marco de datos para investigar cadenas de posesiones
+    pos_chain_df = pd.DataFrame()
+
+    # Compruebe si cada evento lo completa el mismo equipo que los siguientes eventos (check_evts-1)
+    for n in np.arange(1, chain_check):
+        pos_chain_df[f'evt_{n}_same_team'] = abs(match_pos_events_df['teamBinary'].diff(periods=-n))
+        pos_chain_df[f'evt_{n}_same_team'] = pos_chain_df[f'evt_{n}_same_team'].apply(lambda x: 1 if x > 1 else x)
+    pos_chain_df['enough_evt_same_team'] = pos_chain_df.sum(axis=1).apply(lambda x: 1 if x < chain_check - suc_evts_in_chain else 0)
+    pos_chain_df['enough_evt_same_team'] = pos_chain_df['enough_evt_same_team'].diff(periods=1)
+    pos_chain_df[pos_chain_df['enough_evt_same_team'] < 0] = 0
+
+    match_pos_events_df['period'] = pd.to_numeric(match_pos_events_df['period'], errors='coerce')
+    # Comprueba que no hay inicios de los próximos eventos (check_evts-1)
+    pos_chain_df['upcoming_ko'] = 0
+    for ko in match_pos_events_df[(match_pos_events_df['goalBinary'] == 1) | (match_pos_events_df['period'].diff(periods=1))].index.values:
+        ko_pos = match_pos_events_df.index.to_list().index(ko)
+        pos_chain_df.iloc[ko_pos - suc_evts_in_chain:ko_pos, 5] = 1
+
+    # Determinar los inicios de posesión válidos según el equipo del evento y los próximos reinicios
+    pos_chain_df['valid_pos_start'] = (pos_chain_df.fillna(0)['enough_evt_same_team'] - pos_chain_df.fillna(0)['upcoming_ko'])
+
+    # Sumar inicios de posesión por reinicios (cambios de período y goles)
+    pos_chain_df['kick_off_period_change'] = match_pos_events_df['period'].diff(periods=1)
+    pos_chain_df['kick_off_goal'] = ((match_pos_events_df['type'] == 'Goal')
+                     .astype(int).diff(periods=1).apply(lambda x: 1 if x < 0 else 0))
+    pos_chain_df.loc[pos_chain_df['kick_off_period_change'] == 1, 'valid_pos_start'] = 1
+    pos_chain_df.loc[pos_chain_df['kick_off_goal'] == 1, 'valid_pos_start'] = 1
+
+    # Agregar la primera posesión de forma manual
+    pos_chain_df['teamName'] = match_pos_events_df['teamName']
+    pos_chain_df.loc[pos_chain_df.head(1).index, 'valid_pos_start'] = 1
+    pos_chain_df.loc[pos_chain_df.head(1).index, 'possession_id'] = 1
+    pos_chain_df.loc[pos_chain_df.head(1).index, 'possession_team'] = pos_chain_df.loc[pos_chain_df.head(1).index, 'teamName']
+
+    # Iterar a través de inicios de posesión válidos y asignarles identificadores
+    valid_pos_start_id = pos_chain_df[pos_chain_df['valid_pos_start'] > 0].index
+
+    possession_id = 2
+    for idx in np.arange(1, len(valid_pos_start_id)):
+        current_team = pos_chain_df.loc[valid_pos_start_id[idx], 'teamName']
+        previous_team = pos_chain_df.loc[valid_pos_start_id[idx - 1], 'teamName']
+        if ((previous_team == current_team) & (pos_chain_df.loc[valid_pos_start_id[idx], 'kick_off_goal'] != 1) &
+                (pos_chain_df.loc[valid_pos_start_id[idx], 'kick_off_period_change'] != 1)):
+            pos_chain_df.loc[valid_pos_start_id[idx], 'possession_id'] = np.nan
+        else:
+            pos_chain_df.loc[valid_pos_start_id[idx], 'possession_id'] = possession_id
+            pos_chain_df.loc[valid_pos_start_id[idx], 'possession_team'] = pos_chain_df.loc[valid_pos_start_id[idx], 'teamName']
+            possession_id += 1
+
+    # Asignar los identificadores de posesión y eal equipo dentro del cuadro de eventos
+    match_events_df = pd.merge(match_events_df, pos_chain_df[['possession_id', 'possession_team']], how='left', left_index=True, right_index=True)
+
+    # Completa los identificadores de posesión y el equipo en posesión
+    match_events_df[['possession_id', 'possession_team']] = (match_events_df[['possession_id', 'possession_team']].fillna(method='ffill'))
+    match_events_df[['possession_id', 'possession_team']] = (match_events_df[['possession_id', 'possession_team']].fillna(method='bfill'))
+
+    # Se aplica al df
+    events_out = pd.concat([events_out, match_events_df])
+
+    return events_out
+
+def process_whoscored_event_data(events_file, players_file):
+    """
+    Procesa los datos de eventos y jugadores de WhoScored
+    
+    Args:
+        events_file (str): Ruta al archivo CSV de eventos
+        players_file (str): Ruta al archivo CSV de jugadores
+    
+    Returns:
+        tuple: DataFrames procesados de eventos y jugadores
+    """
+    # Cargar DataFrames
+    df = pd.read_csv(events_file)
+    dfp = pd.read_csv(players_file)
+    
+    # Procesar tipos de eventos y periodos
+    df['type'] = df['type'].str.extract(r"'displayName': '([^']+)")
+    df['outcomeType'] = df['outcomeType'].str.extract(r"'displayName': '([^']+)")
+    df['period'] = df['period'].str.extract(r"'displayName': '([^']+)")
+    
+    # Mapeo de periodos
+    df['period'] = df['period'].replace({
+        'FirstHalf': 1, 'SecondHalf': 2, 
+        'FirstPeriodOfExtraTime': 3, 'SecondPeriodOfExtraTime': 4, 
+        'PenaltyShootout': 5, 'PostGame': 14, 'PreMatch': 16
+    })
+    
+    # Procesar datos
+    df = cumulative_match_mins(df)
+    df = insert_ball_carries(df)
+    
+    # Obtener nombres de equipos
+    teams_dict = df['teamId'].value_counts().to_dict()
+    teams_dict = {k: v for k, v in sorted(teams_dict.items(), key=lambda item: item[1], reverse=True)[:2]}
+    teams_dict = {k: f"Team {i+1}" for i, k in enumerate(teams_dict.keys())}
+    
+    # Añadir columnas
+    df['teamName'] = df['teamId'].map(teams_dict)
+    team_names = list(teams_dict.values())
+    opposition_dict = {team_names[i]: team_names[1-i] for i in range(len(team_names))}
+    df['oppositionTeamName'] = df['teamName'].map(opposition_dict)
+    
+    # Conversión de coordenadas
+    df['x'] = df['x'] * 1.05
+    df['y'] = df['y'] * 0.68
+    df['endX'] = df['endX'] * 1.05
+    df['endY'] = df['endY'] * 0.68
+    
+    # Columnas a eliminar en jugadores
+    columns_to_drop = ['Unnamed: 0', 'height', 'weight', 'age', 'isManOfTheMatch', 
+                       'field', 'stats', 'subbedInPlayerId', 'subbedOutPeriod', 
+                       'subbedOutExpandedMinute', 'subbedInPeriod', 
+                       'subbedInExpandedMinute', 'subbedOutPlayerId', 'teamId']
+    dfp.drop(columns=columns_to_drop, inplace=True)
+    
+    # Combinar eventos y jugadores
+    df = df.merge(dfp, on='playerId', how='left')
+    
+    # Cálculo de distancias progresivas
+    df['prog_pass'] = np.where((df['type'] == 'Pass'), 
+                               np.sqrt((105 - df['x'])**2 + (34 - df['y'])**2) - 
+                               np.sqrt((105 - df['endX'])**2 + (34 - df['endY'])**2), 0)
+    
+    df['prog_carry'] = np.where((df['type'] == 'Carry'), 
+                                np.sqrt((105 - df['x'])**2 + (34 - df['y'])**2) - 
+                                np.sqrt((105 - df['endX'])**2 + (34 - df['endY'])**2), 0)
+    
+    df['pass_or_carry_angle'] = np.degrees(np.arctan2(df['endY'] - df['y'], df['endX'] - df['x']))
+    
+    # Normalizar nombres
+    df['name'] = df['name'].astype(str)
+    df['name'] = df['name'].apply(unidecode)
+    
+    # Generar nombres cortos
+    df['shortName'] = df['name'].apply(get_short_name)
+    
+    # Obtener cadenas de posesión
+    df = get_possession_chains(df, 5, 3)
+    
+    # Restaurar nombres de periodos
+    df['period'] = df['period'].replace({
+        1: 'FirstHalf', 2: 'SecondHalf', 
+        3: 'FirstPeriodOfExtraTime', 4: 'SecondPeriodOfExtraTime', 
+        5: 'PenaltyShootout', 14: 'PostGame', 16: 'PreMatch'
+    })
+    
+    # Filtrar periodos
+    df = df[df['period'] != 'PenaltyShootout']
+    df = df.reset_index(drop=True)
+    
+    return df, dfp, teams_dict
+
+def get_short_name(full_name):
+    """
+    Extrae un nombre corto a partir del nombre completo
+    
+    Args:
+        full_name (str): Nombre completo
+    
+    Returns:
+        str: Nombre corto
+    """
+    if pd.isna(full_name):
+        return full_name
+    
+    parts = full_name.split()
+    if len(parts) == 1:
+        return full_name
+    elif len(parts) == 2:
+        return parts[0][0] + ". " + parts[1]
+    else:
+        return parts[0][0] + ". " + parts[1][0] + ". " + " ".join(parts[2:])
+
+def get_passes_df(df):
+    """
+    Obtiene un DataFrame de pases a partir del DataFrame de eventos
+    
+    Args:
+        df (pandas.DataFrame): DataFrame de eventos
+    
+    Returns:
+        pandas.DataFrame: DataFrame de pases
+    """
+    df1 = df[~df['type'].str.contains('SubstitutionOn|FormationChange|FormationSet|Card')]
+    df = df1
+    df.loc[:, "receiver"] = df["playerId"].shift(-1)
+    passes_ids = df.index[df['type'] == 'Pass']
+    df_passes = df.loc[passes_ids, ["index", "x", "y", "endX", "endY", "teamName", 
+                                    "playerId", "receiver", "type", "outcomeType", 
+                                    "pass_or_carry_angle"]]
+
+    return df_passes
+
+def get_passes_between_df(teamName, passes_df, players_df,events_df):
+    """
+    Obtiene un DataFrame de pases entre jugadores
+    
+    Args:
+        teamName (str): Nombre del equipo
+        passes_df (pandas.DataFrame): DataFrame de pases
+        players_df (pandas.DataFrame): DataFrame de jugadores
+    
+    Returns:
+        tuple: DataFrames de pases entre jugadores y ubicaciones medias
+    """
+    passes_df = passes_df[(passes_df["teamName"] == teamName)]
+    dfteam = events_df[(events_df['teamName'] == teamName) & 
+                (~events_df['type'].str.contains('SubstitutionOn|FormationChange|FormationSet|Card'))]
+    
+    passes_df = passes_df.merge(players_df[["playerId", "isFirstEleven"]], on='playerId', how='left')
+    
+    # Cálculo de posiciones medias
+    average_locs_and_count_df = (dfteam.groupby('playerId').agg({'x': ['median'], 'y': ['median', 'count']}))
+    average_locs_and_count_df.columns = ['pass_avg_x', 'pass_avg_y', 'count']
+    average_locs_and_count_df = average_locs_and_count_df.merge(
+        players_df[['playerId', 'name', 'shirtNo', 'position', 'isFirstEleven']], 
+        on='playerId', how='left'
+    )
+    average_locs_and_count_df = average_locs_and_count_df.set_index('playerId')
+    average_locs_and_count_df['name'] = average_locs_and_count_df['name'].apply(unidecode)
+    
+    # Número de pases entre jugadores
+    passes_player_ids_df = passes_df.loc[:, ['index', 'playerId', 'receiver', 'teamName']]
+    passes_player_ids_df['pos_max'] = (passes_player_ids_df[['playerId', 'receiver']].max(axis='columns'))
+    passes_player_ids_df['pos_min'] = (passes_player_ids_df[['playerId', 'receiver']].min(axis='columns'))
+    
+    passes_between_df = passes_player_ids_df.groupby(['pos_min', 'pos_max']).index.count().reset_index()
+    passes_between_df.rename({'index': 'pass_count'}, axis='columns', inplace=True)
+    
+    passes_between_df = passes_between_df.merge(average_locs_and_count_df, left_on='pos_min', right_index=True)
+    passes_between_df = passes_between_df.merge(average_locs_and_count_df, left_on='pos_max', right_index=True, suffixes=['', '_end'])
+
+    return passes_between_df, average_locs_and_count_df

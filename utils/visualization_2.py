@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.colors import to_rgba
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -7,6 +8,9 @@ import seaborn as sns
 from data.jornada_data.csv_lectura import normalize_team_name  # Ajusta la ruta según tu estructura de directorios
 from PIL import Image
 import io
+import traceback
+
+from mplsoccer import Pitch
 
 
 def plot_team_metrics(match_stats, local_info, visitante_info):
@@ -159,43 +163,132 @@ def plot_team_metrics(match_stats, local_info, visitante_info):
             use_container_width=True  # Ocupa todo el ancho disponible
         )
 
-def plot_passing_network(network_data):
-    """
-    Genera una visualización de la red de pases de un equipo
-    """
-    fig, ax = plt.subplots(figsize=(8, 6))
+# - - - - - - - - -
+# Función red de pases
+
+# Colores globales
+green = '#2d9900'
+red = '#e60000'
+blue = '#172790'
+bg_color = '#f5f5f5'
+line_color = '#000000'
+atleti_color = '#172790'
+rival_color = '#e60000'
+
+def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df, col, teamName, 
+                               passes_df=None, hteamName=None, ateamName=None):
+    MAX_LINE_WIDTH = 15
+    MAX_MARKER_SIZE = 3000
+    passes_between_df['width'] = (passes_between_df.pass_count / passes_between_df.pass_count.max() * MAX_LINE_WIDTH)
     
-    # Dibujar el campo de fútbol
-    draw_pitch(ax)
+    MIN_TRANSPARENCY = 0.05
+    MAX_TRANSPARENCY = 0.85
+    color = np.array(to_rgba(col))
+    color = np.tile(color, (len(passes_between_df), 1))
+    c_transparency = passes_between_df.pass_count / passes_between_df.pass_count.max()
+    c_transparency = (c_transparency * (MAX_TRANSPARENCY - MIN_TRANSPARENCY)) + MIN_TRANSPARENCY
+    color[:, 3] = c_transparency
+
+    atleti_color = '#172790'  # Azul oscuro para el Atlético de Madrid
+    rival_color = '#e60000'   # Rojo para el equipo rival
+    bg_color = '#E6E6E6'      # Gris mediano para el fondo del campo
+    line_color = '#001F3F'    # Azul oscuro para las líneas y textos
+
+    pitch = Pitch(pitch_type='uefa', corner_arcs=True, pitch_color=bg_color, line_color=line_color, linewidth=2)
+    pitch.draw(ax=ax)
+    ax.set_xlim(-0.5, 105.5)
+
+    # Plot de las líneas
+    pitch.lines(passes_between_df.pass_avg_x, passes_between_df.pass_avg_y, 
+                passes_between_df.pass_avg_x_end, passes_between_df.pass_avg_y_end,
+                lw=passes_between_df.width, color=color, zorder=1, ax=ax)
+
+    # Plot de los nodos
+    for index, row in average_locs_and_count_df.iterrows():
+        if row['isFirstEleven'] == True:
+            pitch.scatter(row['pass_avg_x'], row['pass_avg_y'], s=1000, marker='o', 
+                          color=bg_color, edgecolor=line_color, linewidth=2, alpha=1, ax=ax)
+        else:
+            pitch.scatter(row['pass_avg_x'], row['pass_avg_y'], s=1000, marker='s', 
+                          color=bg_color, edgecolor=line_color, linewidth=2, alpha=0.75, ax=ax)
+
+    # Plot de los nombres
+    for index, row in average_locs_and_count_df.iterrows():
+        player_name = row["name"].split()[-1]
+        pitch.annotate(player_name, xy=(row.pass_avg_x, row.pass_avg_y), c=col, 
+                       ha='center', va='center', size=8, weight='bold', ax=ax)
+
+    # Linea que marca la altura media de los pases
+    avgph = round(average_locs_and_count_df['pass_avg_x'].median(), 2)
+    ax.axvline(x=avgph, color='gray', linestyle='--', alpha=0.75, linewidth=2)
+
+    # Altura media de pases de los defensores
+    center_backs_height = average_locs_and_count_df[average_locs_and_count_df['position']=='DC']
+    def_line_h = round(center_backs_height['pass_avg_x'].median(), 2) if not center_backs_height.empty else avgph
+    ax.axvline(x=def_line_h, color='gray', linestyle='dotted', alpha=0.5, linewidth=2)
     
-    # Dibujar nodos (jugadores)
-    for node in network_data['nodes']:
-        ax.scatter(node['x'], node['y'], s=node['size']*100, 
-                  color=node['color'], alpha=0.7, 
-                  edgecolors='white', linewidths=1)
-        
-        # Etiquetas de jugadores
-        ax.text(node['x'], node['y'] - 2, node['label'], 
-               ha='center', va='center', color='white', 
-               fontsize=8, fontweight='bold')
+    # Altura media de pases de los dos jugadores más adelantados
+    Forwards_height = average_locs_and_count_df[average_locs_and_count_df['isFirstEleven']==1]
+    Forwards_height = Forwards_height.sort_values(by='pass_avg_x', ascending=False)
+    Forwards_height = Forwards_height.head(2)
+    fwd_line_h = round(Forwards_height['pass_avg_x'].mean(), 2) if not Forwards_height.empty else avgph
+    ax.axvline(x=fwd_line_h, color='gray', linestyle='dotted', alpha=0.5, linewidth=2)
     
-    # Dibujar aristas (pases)
-    for edge in network_data['edges']:
-        ax.plot([edge['source_x'], edge['target_x']], 
-                [edge['source_y'], edge['target_y']], 
-                color=edge['color'], alpha=edge['weight']/10, 
-                linewidth=edge['weight'])
+    # Color de la zona media de posiciones del equipo
+    ymid = [0, 0, 68, 68]
+    xmid = [def_line_h, fwd_line_h, fwd_line_h, def_line_h]
+    ax.fill(xmid, ymid, col, alpha=0.1)
+
+    # Verticalidad de los equipos
+    if passes_df is not None:
+        team_passes_df = passes_df[passes_df["teamName"] == teamName].copy()
+        team_passes_df['pass_or_carry_angle'] = team_passes_df['pass_or_carry_angle'].abs()
+        team_passes_df = team_passes_df[
+            (team_passes_df['pass_or_carry_angle']>=0) & 
+            (team_passes_df['pass_or_carry_angle']<=90)
+        ]
+        med_ang = team_passes_df['pass_or_carry_angle'].median()
+        verticality = round((1 - med_ang/90)*100, 2)
+    else:
+        verticality = 0
+
+    # Extrayendo el top de asociaciones de pases
+    passes_between_df_sorted = passes_between_df.sort_values(by='pass_count', ascending=False)
+    most_pass_from = passes_between_df_sorted['name'].iloc[0] if not passes_between_df_sorted.empty else "N/A"
+    most_pass_to = passes_between_df_sorted['name_end'].iloc[0] if not passes_between_df_sorted.empty else "N/A"
+    most_pass_count = passes_between_df_sorted['pass_count'].iloc[0] if not passes_between_df_sorted.empty else 0
     
-    # Añadir leyenda y estadísticas
-    ax.set_title("Red de Pases", fontsize=14)
-    
-    # Información adicional en el gráfico
-    ax.text(0, -10, f"Pases totales: {len(network_data['edges'])}", 
-           ha='left', fontsize=10)
-    ax.text(100, -10, f"Precisión: {network_data.get('accuracy', 0):.1f}%", 
-           ha='right', fontsize=10)
-    
-    return fig
+    # Cabecera y otros textos
+    if teamName == ateamName:
+        # Invierte el campo para el visitante
+        ax.invert_xaxis()
+        ax.invert_yaxis()
+        ax.text(avgph-1, 73, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='left')
+        ax.text(105, 73, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='left')
+    else:
+        ax.text(avgph-1, -5, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='right')
+        ax.text(105, -5, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='right')
+
+    # Otros textos
+    if teamName == hteamName:
+        ax.text(2, 66, "Círculo = Tit\nCuadrado = Sup", color=col, size=12, ha='left', va='top')
+        ax.set_title(f"{teamName}\nRed de pases", color=line_color, size=25, fontweight='bold')
+    else:
+        ax.text(2, 2, "Círculo = Tit\nCuadrado = Sup", color=col, size=12, ha='right', va='top')
+        ax.set_title(f"{teamName}\nRed de pases", color=line_color, size=25, fontweight='bold')
+
+    # Devuelve las estadísticas 
+    return {
+        'Team_Name': teamName,
+        'Defense_Line_Height': def_line_h,
+        'Verticality_%': verticality,
+        'Most_pass_combination_from': most_pass_from,
+        'Most_pass_combination_to': most_pass_to,
+        'Most_passes_in_combination': most_pass_count,
+    }
+
+# ----------------------------------------------------------------
+# Función visualización xG comparación
 
 def plot_xg_comparison(xg_data, local_info, visitante_info):
     """

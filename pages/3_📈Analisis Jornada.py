@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import base64
 from datetime import datetime
 from pathlib import Path
+import traceback
+import os
 
 from utils.auth import check_auth, logout
 from common.pdf_export import export_to_pdf, download_pdf_button
@@ -12,10 +14,10 @@ from common.pdf_export import export_to_pdf, download_pdf_button
 from utils.styles import load_all_styles
 
 from data.jornada_data.url_mapeo import load_partidos_master, load_equipos_master
-from data.jornada_data.csv_lectura import load_match_stats, load_partido_stats
+from data.jornada_data.csv_lectura import load_match_stats, load_partido_stats, process_whoscored_event_data, get_passes_df, get_passes_between_df
 from data.jornada_data.func_escraper import get_passing_network, get_xg_data, get_match_momentum, get_shot_map
-from utils.visualization_2 import plot_team_metrics # plot_passing_network, plot_xg_comparison, plot_match_momentum, plot_shot_map
-
+from utils.visualization_2 import plot_team_metrics, pass_network_visualization, atleti_color, rival_color # plot_xg_comparison, plot_match_momentum, plot_shot_map
+ 
 # Configuración de la página
 st.set_page_config(
     page_title="Atlético de Madrid 24/25",
@@ -184,44 +186,70 @@ def main():
         # En cada pestaña, colocamos la visualización correspondiente
         with tab1:
             st.subheader("Redes de pases")
-            st.info("Visualización de Redes de Pase próximamente")
-            """
-            with st.spinner("Cargando datos de pases..."):
-                try:
-                    # Función de caché para redes de pases
-                    @st.cache_data(ttl=3600)
-                    def get_cached_passing_network(id_whoscored):
-                        return get_passing_network(id_whoscored)
-                    
-                    # Usar el ID de whoscored del partido
-                    id_whoscored = partido_data.get('id_whoscored')
-                    if id_whoscored:
-                        passing_data = get_cached_passing_network(id_whoscored)
-                        
-                        if passing_data and local_info and visitante_info:
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.write(f"{equipo_local} - Red de pases")
-                                local_network_fig = plot_passing_network(
-                                    passing_data['local'], 
-                                    equipo_local
-                                )
-                                st.pyplot(local_network_fig)
-                            
-                            with col2:
-                                st.write(f"{equipo_visitante} - Red de pases")
-                                visitante_network_fig = plot_passing_network(
-                                    passing_data['visitante'], 
-                                    equipo_visitante
-                                )
-                                st.pyplot(visitante_network_fig)
-                        else:
-                            st.info("Datos de red de pases no disponibles para este partido")
-                    else:
-                        st.info("No se encontró ID de WhoScored para este partido")
-                except Exception as e:
-                    st.error(f"Error al cargar redes de pases: {str(e)}")
-            """
+    
+            try:
+                                # Reemplazar el espacio con un guion bajo
+                jornada_formato = selected_jornada.replace(' ', '_')
+        
+                # Imprimir rutas de archivos
+                events_file = f"data/FData/matches/{jornada_formato}_EventData_whoscored.csv"
+                players_file = f"data/FData/matches/{jornada_formato}_PlayerData_whoscored.csv"
+
+                # Procesar los datos de eventos y jugadores
+                df, dfp, teams_dict = process_whoscored_event_data(events_file, players_file)
+        
+                # Procesar los datos de eventos y jugadores
+                df, dfp, teams_dict = process_whoscored_event_data(
+                    f"data/FData/matches/{jornada_formato}_EventData_whoscored.csv", 
+                    f"data/FData/matches/{jornada_formato}_PlayerData_whoscored.csv"
+                )
+        
+                # Preparar datos para visualización de redes de pases
+                passes_df = get_passes_df(df)
+        
+                # Nombres de equipos
+                team_names = list(teams_dict.values())
+        
+                # Asignar colores basados en si el equipo es el Atleti
+                if 'Atletico' in team_names[0]:  # Si el Atleti es local
+                    hcol = atleti_color
+                    acol = rival_color
+                    hteamName = team_names[0]
+                    ateamName = team_names[1]
+                else:  # Si el Atleti es visitante
+                    hcol = rival_color
+                    acol = atleti_color
+                    hteamName = team_names[1]
+                    ateamName = team_names[0]
+        
+                # Generar visualizaciones
+                fig, axs = plt.subplots(1, 2, figsize=(20, 10), facecolor="#d4d4d4")
+        
+                home_passes_between_df, home_average_locs_and_count_df = get_passes_between_df(
+                    team_names[0], passes_df, dfp, df
+                )
+                away_passes_between_df, away_average_locs_and_count_df = get_passes_between_df(
+                    team_names[1], passes_df, dfp, df
+                )
+        
+                # Visualización
+                pass_network_stats_home = pass_network_visualization(
+                    axs[0], home_passes_between_df, home_average_locs_and_count_df, 
+                    hcol, team_names[0], passes_df=passes_df, 
+                    hteamName=hteamName, ateamName=ateamName
+                )
+                pass_network_stats_away = pass_network_visualization(
+                    axs[1], away_passes_between_df, away_average_locs_and_count_df, 
+                    acol, team_names[1], passes_df=passes_df, 
+                    hteamName=hteamName, ateamName=ateamName
+                )
+        
+                plt.tight_layout()
+                st.pyplot(fig)
+    
+            except Exception as e:
+                st.error(f"Error al generar red de pases: {str(e)}")
+                st.write(traceback.format_exc())
         
         with tab2:
             st.subheader("Expected Goals (xG)")
