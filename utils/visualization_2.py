@@ -163,7 +163,7 @@ def plot_team_metrics(match_stats, local_info, visitante_info):
             use_container_width=True  # Ocupa todo el ancho disponible
         )
 
-# - - - - - - - - -
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Función red de pases
 
 
@@ -183,7 +183,11 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     rival_color = '#e60000'   # Rojo para el equipo rival
     bg_color = '#E6E6E6'      # Gris mediano para el fondo del campo
     line_color = '#001F3F'    # Azul oscuro para las líneas y textos
-
+    
+    # Usar el color proporcionado o un valor predeterminado
+    if team_color is None:
+        team_color = atleti_color  # Color predeterminado si no se proporciona
+    
     # Determinar si es el equipo local o visitante
     is_home_team = teamName == home_team
 
@@ -261,21 +265,21 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     most_pass_to = passes_between_df_sorted['name_end'].iloc[0] if not passes_between_df_sorted.empty else "N/A"
     most_pass_count = passes_between_df_sorted['pass_count'].iloc[0] if not passes_between_df_sorted.empty else 0
     
-    # Cabecera y otros textos
+    # Para el equipo local (siempre a la izquierda)
     if is_home_team:
-        
+        # No invertir ejes
         ax.text(avgph-1, -5, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='right')
         ax.text(105, -5, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='right')
         ax.text(2, 66, "Círculo = Tit\nCuadrado = Sup", color=team_color, size=12, ha='left', va='top')
-        ax.set_title(f"{home_team}", color=line_color, size=25, fontweight='bold')
+        ax.set_title(f"{teamName}", color=line_color, size=25, fontweight='bold')
     else:
-        # Invierte el campo para el visitante
+        # Para visitante (siempre a la derecha), invertir los ejes
         ax.invert_xaxis()
         ax.invert_yaxis()
         ax.text(avgph-1, 73, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='left')
         ax.text(105, 73, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='left')
         ax.text(2, 2, "Círculo = Tit\nCuadrado = Sup", color=team_color, size=12, ha='right', va='top')
-        ax.set_title(f"{away_team}", color=line_color, size=25, fontweight='bold')
+        ax.set_title(f"{teamName}", color=line_color, size=25, fontweight='bold')
 
     # Devuelve las estadísticas 
     return {

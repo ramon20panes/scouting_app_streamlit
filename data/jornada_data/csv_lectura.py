@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np  
 import os
+import glob
+    
 from pathlib import Path
 from unidecode import unidecode
 import json
@@ -391,105 +393,162 @@ def process_whoscored_event_data(events_file, players_file, teams_file):
     Args:
         events_file (str): Ruta al archivo CSV de eventos
         players_file (str): Ruta al archivo CSV de jugadores
+        teams_file (str): Ruta al archivo CSV con mapeo de equipos
     
     Returns:
-        tuple: DataFrames procesados de eventos y jugadores
+        tuple: DataFrames procesados de eventos y jugadores, info de equipos
     """
-    # Cargar DataFrames
-    df = pd.read_csv(events_file)
-    dfp = pd.read_csv(players_file)
-    dft = pd.read_csv(teams_file, sep=';')
-
-    # Mapeo de IDs de equipos a nombres
-    team_id_to_name = dict(zip(dft['id_whoscored'], dft['nombre']))
+    # Verificar si los archivos existen
+    import os
+    import glob
+    import re
     
-    # Determinar equipo local y visitante
-    home_team_id = dfp['teamId'].mode().iloc[0]  # El teamId más frecuente entre los primeros jugadores
-    home_team_name = team_id_to_name[home_team_id]
-
-    # Identificar el equipo visitante como el otro equipo presente
-    away_team_id = dfp[dfp['teamId'] != home_team_id]['teamId'].mode().iloc[0]
-    away_team_name = team_id_to_name[away_team_id]
+    # Si el archivo de eventos no existe, intentar buscar un archivo similar
+    if not os.path.exists(events_file):
+        # Obtener la base del nombre del archivo
+        base_path = os.path.dirname(events_file)
+        filename = os.path.basename(events_file)
+        
+        # Extraer la jornada y los equipos del nombre
+        match = re.match(r"(\d+ª)_([A-Za-z]+)-([A-Za-z]+)_EventData_whoscored\.csv", filename)
+        
+        if match:
+            jornada, equipo1, equipo2 = match.groups()
+            # Buscar archivos con la misma jornada
+            pattern = f"{base_path}/{jornada}_*_EventData_whoscored.csv"
+            possible_files = glob.glob(pattern)
+            
+            if possible_files:
+                events_file = possible_files[0]  # Usar el primer archivo encontrado
+                print(f"Usando archivo alternativo: {events_file}")
+                
+                # También actualizar el archivo de jugadores para mantener consistencia
+                players_file = events_file.replace("_EventData_", "_PlayerData_")
+    
+    # Extraer nombres de equipos del nombre del archivo
+    filename = os.path.basename(events_file)
+    match = re.match(r"(\d+ª)_([A-Za-z]+)-([A-Za-z]+)_EventData_whoscored\.csv", filename)
+    
+    file_home_team = None
+    file_away_team = None
+    
+    if match:
+        _, file_home_team, file_away_team = match.groups()
+        print(f"Equipos en nombre de archivo: {file_home_team}-{file_away_team}")
+    
+    # Cargar DataFrames
+    df_red = pd.read_csv(events_file)
+    dfp_red = pd.read_csv(players_file)
+    dft_red = pd.read_csv(teams_file, sep=';')
+    
+    # Mapeo de IDs de equipos a nombres
+    team_id_to_name = dict(zip(dft_red['id_whoscored'], dft_red['nombre']))
+    
+    # Determinar equipo local y visitante basado en la frecuencia de IDs
+    home_team_id = dfp_red['teamId'].mode().iloc[0]
+    away_team_id = dfp_red[dfp_red['teamId'] != home_team_id]['teamId'].mode().iloc[0]
     
     # Obtener nombres de equipos
-    teams_dict = {home_team_id: home_team_name, away_team_id: away_team_name}
+    home_team_name = team_id_to_name.get(home_team_id, f"Equipo {home_team_id}")
+    away_team_name = team_id_to_name.get(away_team_id, f"Equipo {away_team_id}")
+    
+    # Identificar si el Atlético de Madrid es local o visitante
+    is_atleti_home = False
+    for team_name in [home_team_name, away_team_name]:
+        if 'atleti' in team_name.lower() or 'atletico' in team_name.lower() or 'atlético' in team_name.lower():
+            is_atleti_home = (team_name == home_team_name)
+            break
     
     # Procesar tipos de eventos y periodos
-    df['type'] = df['type'].str.extract(r"'displayName': '([^']+)")
-    df['outcomeType'] = df['outcomeType'].str.extract(r"'displayName': '([^']+)")
-    df['period'] = df['period'].str.extract(r"'displayName': '([^']+)")
+    df_red['type'] = df_red['type'].str.extract(r"'displayName': '([^']+)")
+    df_red['outcomeType'] = df_red['outcomeType'].str.extract(r"'displayName': '([^']+)")
+    df_red['period'] = df_red['period'].str.extract(r"'displayName': '([^']+)")
     
     # Mapeo de periodos
-    df['period'] = df['period'].replace({
+    df_red['period'] = df_red['period'].replace({
         'FirstHalf': 1, 'SecondHalf': 2, 
         'FirstPeriodOfExtraTime': 3, 'SecondPeriodOfExtraTime': 4, 
         'PenaltyShootout': 5, 'PostGame': 14, 'PreMatch': 16
     })
     
     # Procesar datos
-    df = cumulative_match_mins(df)
-    df = insert_ball_carries(df)
+    df_red = cumulative_match_mins(df_red)
+    df_red = insert_ball_carries(df_red)
     
-    # Obtener nombres de equipos
-    teams_dict = df['teamId'].value_counts().to_dict()
-    teams_dict = {k: v for k, v in sorted(teams_dict.items(), key=lambda item: item[1], reverse=True)[:2]}
-    teams_dict = {k: f"Team {i+1}" for i, k in enumerate(teams_dict.keys())}
+    # Añadir nombres de equipos al DataFrame
+    df_red['teamName'] = df_red['teamId'].map({
+        home_team_id: home_team_name, 
+        away_team_id: away_team_name
+    })
     
-    # Añadir columnas
-    df['teamName'] = df['teamId'].map(teams_dict)
-    team_names = list(teams_dict.values())
-    opposition_dict = {team_names[i]: team_names[1-i] for i in range(len(team_names))}
-    df['oppositionTeamName'] = df['teamName'].map(opposition_dict)
+    # Mapa de oposición
+    opposition_dict = {
+        home_team_name: away_team_name,
+        away_team_name: home_team_name
+    }
+    df_red['oppositionTeamName'] = df_red['teamName'].map(opposition_dict)
     
     # Conversión de coordenadas
-    df['x'] = df['x'] * 1.05
-    df['y'] = df['y'] * 0.68
-    df['endX'] = df['endX'] * 1.05
-    df['endY'] = df['endY'] * 0.68
+    df_red['x'] = df_red['x'] * 1.05
+    df_red['y'] = df_red['y'] * 0.68
+    df_red['endX'] = df_red['endX'] * 1.05
+    df_red['endY'] = df_red['endY'] * 0.68
     
     # Columnas a eliminar en jugadores
     columns_to_drop = ['Unnamed: 0', 'height', 'weight', 'age', 'isManOfTheMatch', 
-                       'field', 'stats', 'subbedInPlayerId', 'subbedOutPeriod', 
-                       'subbedOutExpandedMinute', 'subbedInPeriod', 
-                       'subbedInExpandedMinute', 'subbedOutPlayerId', 'teamId']
-    dfp.drop(columns=columns_to_drop, inplace=True)
+                      'field', 'stats', 'subbedInPlayerId', 'subbedOutPeriod', 
+                      'subbedOutExpandedMinute', 'subbedInPeriod', 
+                      'subbedInExpandedMinute', 'subbedOutPlayerId', 'teamId']
+    dfp_red.drop(columns=[col for col in columns_to_drop if col in dfp_red.columns], inplace=True)
     
     # Combinar eventos y jugadores
-    df = df.merge(dfp, on='playerId', how='left')
+    df_red = df_red.merge(dfp_red, on='playerId', how='left')
     
     # Cálculo de distancias progresivas
-    df['prog_pass'] = np.where((df['type'] == 'Pass'), 
-                               np.sqrt((105 - df['x'])**2 + (34 - df['y'])**2) - 
-                               np.sqrt((105 - df['endX'])**2 + (34 - df['endY'])**2), 0)
+    df_red['prog_pass'] = np.where((df_red['type'] == 'Pass'), 
+                               np.sqrt((105 - df_red['x'])**2 + (34 - df_red['y'])**2) - 
+                               np.sqrt((105 - df_red['endX'])**2 + (34 - df_red['endY'])**2), 0)
     
-    df['prog_carry'] = np.where((df['type'] == 'Carry'), 
-                                np.sqrt((105 - df['x'])**2 + (34 - df['y'])**2) - 
-                                np.sqrt((105 - df['endX'])**2 + (34 - df['endY'])**2), 0)
+    df_red['prog_carry'] = np.where((df_red['type'] == 'Carry'), 
+                                np.sqrt((105 - df_red['x'])**2 + (34 - df_red['y'])**2) - 
+                                np.sqrt((105 - df_red['endX'])**2 + (34 - df_red['endY'])**2), 0)
     
-    df['pass_or_carry_angle'] = np.degrees(np.arctan2(df['endY'] - df['y'], df['endX'] - df['x']))
+    df_red['pass_or_carry_angle'] = np.degrees(np.arctan2(df_red['endY'] - df_red['y'], df_red['endX'] - df_red['x']))
     
     # Normalizar nombres
-    df['name'] = df['name'].astype(str)
-    df['name'] = df['name'].apply(unidecode)
+    df_red['name'] = df_red['name'].astype(str)
+    df_red['name'] = df_red['name'].apply(unidecode)
     
     # Generar nombres cortos
-    df['shortName'] = df['name'].apply(get_short_name)
+    df_red['shortName'] = df_red['name'].apply(get_short_name)
     
     # Obtener cadenas de posesión
-    df = get_possession_chains(df, 5, 3)
+    df_red = get_possession_chains(df_red, 5, 3)
     
     # Restaurar nombres de periodos
-    df['period'] = df['period'].replace({
+    df_red['period'] = df_red['period'].replace({
         1: 'FirstHalf', 2: 'SecondHalf', 
         3: 'FirstPeriodOfExtraTime', 4: 'SecondPeriodOfExtraTime', 
         5: 'PenaltyShootout', 14: 'PostGame', 16: 'PreMatch'
     })
     
     # Filtrar periodos
-    df = df[df['period'] != 'PenaltyShootout']
-    df = df.reset_index(drop=True)
+    df_red = df_red[df_red['period'] != 'PenaltyShootout']
+    df_red = df_red.reset_index(drop=True)
     
-    return df, dfp, teams_dict, home_team_name, away_team_name
+    # Información de equipos para la visualización
+    team_info = {
+        'home_team_id': home_team_id,
+        'away_team_id': away_team_id,
+        'home_team_name': home_team_name,
+        'away_team_name': away_team_name,
+        'is_atleti_home': is_atleti_home,
+        'file_home_team': file_home_team,
+        'file_away_team': file_away_team
+        
+    }
+    
+    return df_red, dfp_red, team_info
 
 def get_short_name(full_name):
     """
@@ -532,43 +591,50 @@ def get_passes_df(df):
 
     return df_passes
 
-def get_passes_between_df(teamName, passes_df, players_df,events_df):
+# Actualiza esta función o añádela si no existe
+def get_passes_between_df(teamName, passes_df, players_df, events_df):
     """
-    Obtiene un DataFrame de pases entre jugadores
-    
-    Args:
-        teamName (str): Nombre del equipo
-        passes_df (pandas.DataFrame): DataFrame de pases
-        players_df (pandas.DataFrame): DataFrame de jugadores
-    
-    Returns:
-        tuple: DataFrames de pases entre jugadores y ubicaciones medias
+    Obtiene información de pases entre jugadores y sus posiciones medias
     """
-    passes_df = passes_df[(passes_df["teamName"] == teamName)]
-    dfteam = events_df[(events_df['teamName'] == teamName) & 
-                (~events_df['type'].str.contains('SubstitutionOn|FormationChange|FormationSet|Card'))]
+    # Filtrar eventos y pases para el equipo
+    team_events = events_df[events_df['teamName'] == teamName]
+    team_passes = passes_df[passes_df['teamName'] == teamName]
     
-    passes_df = passes_df.merge(players_df[["playerId", "isFirstEleven"]], on='playerId', how='left')
+    # Calcular posiciones medias de los jugadores
+    average_locs_and_count_df = team_events.groupby('playerId').agg({
+        'x': 'mean',
+        'y': 'mean',
+        'name': 'first',
+        'position': 'first',
+        'isFirstEleven': 'first'
+    }).reset_index()
     
-    # Cálculo de posiciones medias
-    average_locs_and_count_df = (dfteam.groupby('playerId').agg({'x': ['median'], 'y': ['median', 'count']}))
-    average_locs_and_count_df.columns = ['pass_avg_x', 'pass_avg_y', 'count']
-    average_locs_and_count_df = average_locs_and_count_df.merge(
-        players_df[['playerId', 'name', 'shirtNo', 'position', 'isFirstEleven']], 
-        on='playerId', how='left'
+    # Renombrar columnas para la visualización
+    average_locs_and_count_df = average_locs_and_count_df.rename(columns={
+        'x': 'pass_avg_x',
+        'y': 'pass_avg_y'
+    })
+    
+    # Filtrar solo pases completados
+    team_passes = team_passes[team_passes['outcomeType'] == 'Successful']
+    
+    # Calcular pases entre jugadores
+    passes_between_df = team_passes.groupby(['playerId', 'receiver']).size().reset_index(name='pass_count')
+    
+    # Añadir información de posición para origen
+    passes_between_df = passes_between_df.merge(
+        average_locs_and_count_df[['playerId', 'name', 'pass_avg_x', 'pass_avg_y']], 
+        on='playerId',
+        how='left'
     )
-    average_locs_and_count_df = average_locs_and_count_df.set_index('playerId')
-    average_locs_and_count_df['name'] = average_locs_and_count_df['name'].apply(unidecode)
     
-    # Número de pases entre jugadores
-    passes_player_ids_df = passes_df.loc[:, ['index', 'playerId', 'receiver', 'teamName']]
-    passes_player_ids_df['pos_max'] = (passes_player_ids_df[['playerId', 'receiver']].max(axis='columns'))
-    passes_player_ids_df['pos_min'] = (passes_player_ids_df[['playerId', 'receiver']].min(axis='columns'))
+    # Añadir información de posición para destino
+    passes_between_df = passes_between_df.merge(
+        average_locs_and_count_df[['playerId', 'name', 'pass_avg_x', 'pass_avg_y']], 
+        left_on='receiver',
+        right_on='playerId',
+        how='left',
+        suffixes=('', '_end')
+    )
     
-    passes_between_df = passes_player_ids_df.groupby(['pos_min', 'pos_max']).index.count().reset_index()
-    passes_between_df.rename({'index': 'pass_count'}, axis='columns', inplace=True)
-    
-    passes_between_df = passes_between_df.merge(average_locs_and_count_df, left_on='pos_min', right_index=True)
-    passes_between_df = passes_between_df.merge(average_locs_and_count_df, left_on='pos_max', right_index=True, suffixes=['', '_end'])
-
     return passes_between_df, average_locs_and_count_df

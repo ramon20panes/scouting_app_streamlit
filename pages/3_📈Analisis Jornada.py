@@ -185,84 +185,59 @@ def main():
         
         # Creación de pestañas para seleccionar visualización
 
-        # Red de pases del partido elegido
-        
         with tab1:
             st.subheader("Redes de pases")
-            import traceback
             try:
-                # Reemplazar el espacio con un guion bajo
+                # Preparar rutas de archivos
                 jornada_formato = selected_jornada.replace(' ', '_')
-        
-                # Imprimir rutas de archivos
                 events_file = f"data/FData/matches/{jornada_formato}_EventData_whoscored.csv"
                 players_file = f"data/FData/matches/{jornada_formato}_PlayerData_whoscored.csv"
-                teams_file = "data/FData/master/equipos_master.csv"  # Ruta al archivo de equipos
+                teams_file = "data/FData/master/equipos_master.csv"
 
-                # Procesar los datos de eventos y jugadores
-                df, dfp, teams_dict, home_team_name, away_team_name = process_whoscored_event_data(events_file, players_file, teams_file)
+                # Procesar los datos - usar la función existente
+                df_red, dfp_red, team_info = process_whoscored_event_data(events_file, players_file, teams_file)
         
-                # Preparar datos para visualización de redes de pases
-                passes_df = get_passes_df(df)
+                # Preparar datos para visualización
+                passes_df = get_passes_df(df_red)
         
-                # Nombres de equipos
-                hteamName = teams_dict[list(teams_dict.keys())[0]]  # Equipo local
-                ateamName = teams_dict[list(teams_dict.keys())[1]]  # Equipo visitante
-
-                # Definir colores globales al principio del script
+                # Definir colores
                 atleti_color = '#172790'  # Azul oscuro para el Atlético de Madrid
-                rival_color = '#e60000'
-
-                # Lógica de colores
-                if 'Atletico Madrid' in [home_team_name, away_team_name]:
-                    if home_team_name == 'Atletico de Madrid':
-                        hcol = atleti_color  # Azul para Atlético si es local
-                        acol = rival_color   # Rojo para el rival
-                    else:
-                        hcol = rival_color   # Rojo para el local
-                        acol = atleti_color  # Azul para Atlético si es visitante
-                else:
-                    hcol = rival_color  # Rojo para el local
-                    acol = atleti_color  # Azul por defecto para el visitante
-
-                # Asegurar que siempre hay un color
-                hcol = hcol or rival_color
-                acol = acol or atleti_color
-
-                # Generar visualizaciones
+                rival_color = '#e60000'   # Rojo para el equipo rival
+        
+                # Crear figura
                 fig, axs = plt.subplots(1, 2, figsize=(20, 10), facecolor="#d4d4d4")
         
-                home_passes_between_df, home_average_locs_and_count_df = get_passes_between_df(
-                    hteamName, passes_df, dfp, df
-                )
-                away_passes_between_df, away_average_locs_and_count_df = get_passes_between_df(
-                    ateamName, passes_df, dfp, df
-                )
-        
-                # Visualización
-                pass_network_stats_home = pass_network_visualization(
-                    axs[0], home_passes_between_df, home_average_locs_and_count_df, 
-                    hteamName, passes_df=passes_df, 
-                    home_team=home_team_name, away_team=away_team_name,
-                    team_color=hcol
-                )
-                pass_network_stats_away = pass_network_visualization(
-                    axs[1], away_passes_between_df, away_average_locs_and_count_df, 
-                    ateamName, passes_df=passes_df, 
-                    home_team=home_team_name, away_team=away_team_name,
-                    team_color=acol
-                )
-
-                print("Home team:", home_team_name)
-                print("Away team:", away_team_name)
+                # Procesar y visualizar ambos equipos
+                for i, team_name in enumerate([team_info['home_team_name'], team_info['away_team_name']]):
+                    # Determinar si este equipo es el Atlético de Madrid
+                    is_this_team_atleti = (team_info['is_atleti_home'] and i == 0) or (not team_info['is_atleti_home'] and i == 1)
+                    team_color = atleti_color if is_this_team_atleti else rival_color
+            
+                    # Calcular datos para este equipo usando la función existente
+                    passes_between_df, average_locs_df = get_passes_between_df(team_name, passes_df, None, df_red)
+            
+                    # Dibujar red de pases
+                    pass_network_visualization(
+                        ax=axs[i],
+                        passes_between_df=passes_between_df,
+                        average_locs_and_count_df=average_locs_df,
+                        teamName=team_name,
+                        passes_df=passes_df,
+                        home_team=team_info['home_team_name'],
+                        away_team=team_info['away_team_name'],
+                        team_color=team_color
+                    )
         
                 plt.tight_layout()
                 st.pyplot(fig)
-    
+        
             except Exception as e:
                 st.error(f"Error al generar red de pases: {str(e)}")
                 st.write(traceback.format_exc())
-        
+
+        # ----------------------------------------------------------------
+        # XG visualización
+
         with tab2:
             st.subheader("Expected Goals (xG)")
             st.info("Visualización Xg próximamente")
