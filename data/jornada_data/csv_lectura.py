@@ -2,12 +2,14 @@ import pandas as pd
 import numpy as np  
 import os
 import glob
+import re
     
 from pathlib import Path
 from unidecode import unidecode
 import json
 import traceback
 
+from data.jornada_data.url_mapeo import load_partidos_master
 
 # Extracción estadísticas para tabla de jornadas
 
@@ -118,8 +120,7 @@ def get_partido_info(match_id):
     """
     # Esta función debería obtener la información desde tu archivo partidos_master.csv
     # Por ahora, es un placeholder que deberás implementar
-    try:
-        from data.jornada_data.url_mapeo import load_partidos_master
+    try:        
         
         partidos_df = load_partidos_master()
         partido = partidos_df[partidos_df['match_id'] == match_id]
@@ -398,11 +399,7 @@ def process_whoscored_event_data(events_file, players_file, teams_file):
     Returns:
         tuple: DataFrames procesados de eventos y jugadores, info de equipos
     """
-    # Verificar si los archivos existen
-    import os
-    import glob
-    import re
-    
+       
     # Si el archivo de eventos no existe, intentar buscar un archivo similar
     if not os.path.exists(events_file):
         # Obtener la base del nombre del archivo
@@ -458,6 +455,20 @@ def process_whoscored_event_data(events_file, players_file, teams_file):
         if 'atleti' in team_name.lower() or 'atletico' in team_name.lower() or 'atlético' in team_name.lower():
             is_atleti_home = (team_name == home_team_name)
             break
+
+    # Lista de jornadas donde el orden local/visitante está invertido
+    jornadas_invertidas = ["1ª", "10ª", "11ª", "12ª", "14ª", "18ª", "20ª", "24ª"]
+
+    # Extraer la jornada del nombre del archivo
+    match = re.search(r'(\d+ª)', os.path.basename(events_file))
+    if match:
+        jornada_actual = match.group(1)
+        if jornada_actual in jornadas_invertidas:
+            print(f"Jornada {jornada_actual} detectada como invertida, intercambiando equipos")
+            # Intercambiar home_team y away_team
+            home_team_name, away_team_name = away_team_name, home_team_name
+            home_team_id, away_team_id = away_team_id, home_team_id
+            is_atleti_home = not is_atleti_home
     
     # Procesar tipos de eventos y periodos
     df_red['type'] = df_red['type'].str.extract(r"'displayName': '([^']+)")

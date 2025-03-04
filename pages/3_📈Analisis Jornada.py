@@ -7,17 +7,25 @@ from datetime import datetime
 from pathlib import Path
 import traceback
 import os
+import threading
+import time
 
 from utils.auth import check_auth, logout
 from common.pdf_export import export_to_pdf, download_pdf_button
 
 from utils.styles import load_all_styles
 
+from highlight_text import fig_text
+
 from data.jornada_data.url_mapeo import load_partidos_master, load_equipos_master
 from data.jornada_data.csv_lectura import load_match_stats, load_partido_stats, process_whoscored_event_data, get_passes_df, get_passes_between_df
 from data.jornada_data.func_escraper import get_passing_network, get_xg_data, get_match_momentum, get_shot_map
-from utils.visualization_2 import plot_team_metrics, pass_network_visualization, atleti_color, rival_color # plot_xg_comparison, plot_match_momentum, plot_shot_map
- 
+from utils.visualization_2 import plot_team_metrics, pass_network_visualization, atleti_color, rival_color  
+from utils.visualization_2 import fotmob_match_momentum_plot_atletico
+from utils.visualization_2 import plot_xg_timeline, preprocess_xg_data
+
+
+
 # Configuración de la página
 st.set_page_config(
     page_title="Atlético de Madrid 24/25",
@@ -106,21 +114,69 @@ if "page_history" not in st.session_state:
 if not st.session_state.page_history or st.session_state.page_history[-1] != current_page:
     st.session_state.page_history.append(current_page)
 
+# Inicializar caché en session_state si no existe
+if 'momentum_cache' not in st.session_state:
+    st.session_state.momentum_cache = {}
+
+def get_momentum_with_cache(fotmob_id, debug=False):
+    """Obtiene momentum con caché para mejorar rendimiento"""
+    cache_key = f"momentum_{fotmob_id}"
+    
+    # Si ya está en caché, usarlo
+    if cache_key in st.session_state.momentum_cache:
+        return st.session_state.momentum_cache[cache_key]
+    
+    # Si no, obtener nuevos datos
+    try:
+        fig, ax = fotmob_match_momentum_plot_atletico(fotmob_id, debug=debug)
+        
+        # Guardar en caché
+        st.session_state.momentum_cache[cache_key] = (fig, ax)
+        
+        return fig, ax
+    except Exception as e:
+        raise e
+
 # CONTENIDO ESPECÍFICO DE LA PÁGINA - ANÁLISIS POR JORNADA
 def main():
     # 1. Cargar datos maestros
     try:
         partidos_df = load_partidos_master()
         equipos_df = load_equipos_master()
-        
+    
         if partidos_df.empty or equipos_df.empty:
             st.error("No se pudieron cargar los datos maestros")
             return
-            
-        # 2. Selector de jornada simplificado
-        jornadas = partidos_df['formato_jornada'].tolist()
-        selected_jornada = st.selectbox("Selecciona una jornada:", jornadas)
         
+        # 2. Selector de jornada con persistencia
+        jornadas = partidos_df['formato_jornada'].tolist()
+    
+        # Inicializar session_state si no existe
+        if 'selected_jornada' not in st.session_state:
+            st.session_state.selected_jornada = jornadas[0]  # Primera jornada por defecto
+
+        if 'prev_selected_jornada' not in st.session_state:
+            st.session_state.prev_selected_jornada = None
+
+        # Encontrar el índice de la jornada guardada en session_state
+        try:
+            default_index = jornadas.index(st.session_state.selected_jornada)
+        except ValueError:
+            default_index = 0  # Si la jornada guardada no está disponible, usar la primera
+    
+        # Mostrar el selectbox con el valor guardado seleccionado
+        selected_jornada = st.selectbox(
+            "Selecciona una jornada:", 
+            jornadas,
+            index=default_index,
+            key='jornada_selectbox'
+        )
+    
+        # Detectar cambios reales en la selección
+        if st.session_state.prev_selected_jornada != selected_jornada:
+            st.session_state.prev_selected_jornada = selected_jornada
+            st.session_state.selected_jornada = selected_jornada
+            
         # 3. Obtener datos del partido
         partido_row = partidos_df[partidos_df['formato_jornada'] == selected_jornada]
         if partido_row.empty:
@@ -171,21 +227,97 @@ def main():
                 st.warning("No se pudo mostrar la tabla de estadísticas porque falta información de los equipos")
         else:
             st.warning(f"No se encontraron estadísticas para el partido: {partido_str}")
+
+        # ----------------------------------------------------------------
         
         # 8. SECCIÓN DE VISUALIZACIONES - USANDO TABS
         st.header("Visualizaciones avanzadas")
         
         # Crear opciones de visualización como pestañas
         tab1, tab2, tab3, tab4 = st.tabs([
-            "Redes de pases", 
+            "Dinámica del partido",
+            "Redes de pases",                         
             "Expected Goals (xG)", 
-            "Dinámica del partido", 
             "Mapas de tiros"
         ])
         
         # Creación de pestañas para seleccionar visualización
 
         with tab1:
+            st.subheader("Match Momentum")
+
+            # Verificar si estamos en una jornada problemática
+            is_problematic_jornada = selected_jornada in ["2ª", "6ª"]
+
+            if is_problematic_jornada:
+                st.warning(f"La jornada {selected_jornada} puede tener problemas con los datos de momentum.")
+                # Mostrar datos de diagnóstico si es una jornada problemática
+                if st.checkbox("Mostrar información de diagnóstico"):
+                    st.write("Información de la jornada seleccionada:")
+                    st.write(partido_data.to_dict())
+
+            try:
+                # Verificar si tenemos ID de FotMob
+                if 'id_fotmob' in partido_data and not pd.isna(partido_data['id_fotmob']):
+                    fotmob_id = str(partido_data['id_fotmob'])
+    
+                    # Tratamiento especial para jornadas problemáticas
+                    if selected_jornada in ["2ª", "6ª"]:
+                        st.info(f"Los datos de la jornada {selected_jornada} no están disponibles actualmente. Mostrando visualización estática.")
+    
+                        # Mostrar imagen estática o mensaje informativo
+                        if selected_jornada == "2ª":
+                            st.markdown("""
+                            **Detalles del partido:**
+                            - Este partido no tiene datos de momentum disponibles en FotMob
+                            - Puedes consultar otras visualizaciones como la red de pases o los mapas de tiros
+                            """)
+                        elif selected_jornada == "6ª":
+                            st.markdown("""
+                            **Detalles del partido:**
+                            - Este partido no tiene datos de momentum disponibles en FotMob
+                            - Puedes consultar otras visualizaciones como la red de pases o los mapas de tiros
+                            """)
+                    else:
+                
+                        class TimeoutException(Exception):
+                            pass
+
+                        def check_timeout():
+                            time.sleep(15)  # Esperar 15 segundos
+                            if not getattr(threading.current_thread(), "completed", False):
+                                st.error("La solicitud de datos tardó demasiado tiempo. Por favor, inténtalo de nuevo más tarde.")
+                                st.stop()  # Detener la ejecución
+
+                        # Iniciar un hilo para verificar el timeout
+                        timeout_thread = threading.Thread(target=check_timeout)
+                        timeout_thread.daemon = True
+                        timeout_thread.start()
+
+                        try:
+                            # Crear el gráfico de momentum
+                            with st.spinner("Cargando datos de momentum..."):
+                                fig_mm, ax_mm = get_momentum_with_cache(fotmob_id, debug=False)
+                                st.pyplot(fig_mm)
+        
+                            # Marcar como completado
+                            setattr(timeout_thread, "completed", True)
+        
+                        except Exception as e:
+                            setattr(timeout_thread, "completed", True)  # Marcar como completado aunque haya error
+                            st.error(f"Error al generar el gráfico de momentum: {str(e)}")
+                            st.info("Es posible que este partido no tenga datos de momentum disponibles en FotMob.")
+                else:
+                    st.warning(f"No hay ID de FotMob disponible para el partido: {partido_data['equipo_local']} vs {partido_data['equipo_visitante']}")
+                    st.write("Columnas disponibles:", partido_data.index.tolist())
+            
+            except Exception as e:
+                st.error(f"Error general: {str(e)}")
+                st.write(traceback.format_exc())
+        
+            # Mapa de redes de pase 
+
+        with tab2:
             st.subheader("Redes de pases")
             try:
                 # Preparar rutas de archivos
@@ -205,7 +337,7 @@ def main():
                 rival_color = '#e60000'   # Rojo para el equipo rival
         
                 # Crear figura
-                fig, axs = plt.subplots(1, 2, figsize=(20, 10), facecolor="#d4d4d4")
+                fig, axs = plt.subplots(1, 2, figsize=(20, 12), facecolor="#d4d4d4")
         
                 # Procesar y visualizar ambos equipos
                 for i, team_name in enumerate([team_info['home_team_name'], team_info['away_team_name']]):
@@ -235,60 +367,35 @@ def main():
                 st.error(f"Error al generar red de pases: {str(e)}")
                 st.write(traceback.format_exc())
 
-        # ----------------------------------------------------------------
         # XG visualización
 
-        with tab2:
+        with tab3:
             st.subheader("Expected Goals (xG)")
-            st.info("Visualización Xg próximamente")
-            """
+    
             with st.spinner("Cargando datos de xG..."):
                 try:
-                    # Función de caché para xG
-                    @st.cache_data(ttl=3600)
-                    def get_cached_xg_data(id_understat):
-                        return get_xg_data(id_understat)
-                    
-                    id_understat = partido_data.get('id_understat')
-                    if id_understat:
-                        xg_data = get_cached_xg_data(id_understat)
-                        
-                        if xg_data and local_info and visitante_info:
-                            fig = plot_xg_comparison(xg_data, local_info, visitante_info)
-                            st.pyplot(fig)
-                        else:
-                            st.info("Datos de xG no disponibles para este partido")
+                    # Obtener URL del partido desde partido_data
+                    url_partido = partido_data.get('url_fbref')
+            
+                    if url_partido:
+                        # Cargar datos de fbref
+                        df_processed = pd.read_html(url_partido, attrs={'id': 'shots_all'})[0]
+                
+                        # Preprocesar datos de xG
+                        df_xG = preprocess_xg_data(df_processed)
+                
+                        # Crear figura de xG
+                        fig = plot_xg_timeline(df_xG)
+                
+                        # Mostrar figura
+                        st.pyplot(fig)
                     else:
-                        st.info("No se encontró ID de Understat para este partido")
+                        st.info("No se encontró URL de partido para cargar datos de xG")
+        
                 except Exception as e:
                     st.error(f"Error al cargar datos de xG: {str(e)}")
-        """
         
-        with tab3:
-            st.subheader("Dinámica del partido")
-            st.info("Visualización Match Momentum próximamente")
-            """""
-            with st.spinner("Cargando datos de momentum..."):
-                try:
-                    # Función de caché para momentum
-                    @st.cache_data(ttl=3600)
-                    def get_cached_momentum(id_fotmob):
-                        return get_match_momentum(id_fotmob)
-                    
-                    id_fotmob = partido_data.get('id_fotmob')
-                    if id_fotmob:
-                        momentum_data = get_cached_momentum(id_fotmob)
-                        
-                        if momentum_data:
-                            fig = plot_match_momentum(momentum_data, equipo_local, equipo_visitante)
-                            st.pyplot(fig)
-                        else:
-                            st.info("Datos de dinámica no disponibles para este partido")
-                    else:
-                        st.info("No se encontró ID de Fotmob para este partido")
-                except Exception as e:
-                    st.error(f"Error al cargar datos de dinámica: {str(e)}")
-        """
+        # Representación de tiros de ambos equipos
         
         with tab4:
             st.subheader("Mapas de tiros")

@@ -1,14 +1,20 @@
+import numpy as np
+import pandas as pd
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import to_rgba
-import numpy as np
-import pandas as pd
+
 import streamlit as st
 import seaborn as sns
 from data.jornada_data.csv_lectura import normalize_team_name   # Ajusta la ruta según tu estructura de directorios
 from PIL import Image
 import io
 import traceback
+
+from highlight_text import fig_text
+
+import LanusStats as ls
 
 from mplsoccer import Pitch
 
@@ -164,6 +170,121 @@ def plot_team_metrics(match_stats, local_info, visitante_info):
         )
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Función para el match momentum del partido
+
+def fotmob_match_momentum_plot_atletico(match_id, save_fig=False, debug=False):
+    """
+    Implementación del gráfico de momentum para el Atlético de Madrid:
+    - Atlético siempre en azul oscuro, rival siempre en rojo
+    """
+    try:
+    
+        # Inicializar FotMob
+        fotmob = ls.FotMob()
+
+        if debug:
+                print(f"Inicializando FotMob para match_id: {match_id}")
+    
+        # Colores fijos
+        ATLETICO_COLOR = '#172790'  # Color para el Atlético (azul oscuro)
+        RIVAL_COLOR = '#e60000'     # Color para el rival (rojo)
+    
+        # Obtener datos
+        try:
+            response = fotmob.request_match_details(match_id)
+            if debug:
+                print(f"Respuesta obtenida. Status code: {response.status_code}")
+        except Exception as e:
+            raise Exception(f"Error al solicitar datos del partido {match_id}: {str(e)}")
+        
+        try:
+            response_json = response.json()
+            if debug:
+                print("Respuesta JSON procesada correctamente")
+        except Exception as e:
+            raise Exception(f"Error al procesar JSON para partido {match_id}: {str(e)}")
+    
+        # Obtener nombres de equipos
+        try:
+            home_team = response_json['general']['homeTeam']['name']
+            away_team = response_json['general']['awayTeam']['name']
+            if debug:
+                print(f"Equipos obtenidos: {home_team} vs {away_team}")
+        except Exception as e:
+            raise Exception(f"Error al obtener nombres de equipos: {str(e)}")
+    
+        # Verificar qué equipo es el Atlético
+        atletico_is_home = any(name in home_team.lower() for name in ['atl', 'atlético', 'atletico'])
+        atletico_is_away = any(name in away_team.lower() for name in ['atl', 'atlético', 'atletico'])
+    
+        if debug:
+            print(f"Home team: {home_team}")
+            print(f"Away team: {away_team}")
+            print(f"Atlético is home: {atletico_is_home}")
+            print(f"Atlético is away: {atletico_is_away}")
+    
+        # Obtener datos de momentum
+        try:
+            momentum_data = response_json['content']['matchFacts']['momentum']['main']['data']
+            momentum_df = pd.DataFrame(momentum_data)
+        
+            if debug:
+                print("\nPrimeros valores del DataFrame:")
+                print(momentum_df.head())
+                print(f"\nRango de valores: {momentum_df['value'].min()} a {momentum_df['value'].max()}")
+        except:
+            raise Exception(f"El partido {match_id} no tiene datos de momentum")
+    
+        # Crear figura base
+        fig, ax = plt.subplots(figsize=(16, 9), facecolor='#d4d4d4')
+        ax.set_facecolor('#d4d4d4')
+    
+        # ASIGNACIÓN DE COLORES CORREGIDA:
+        # Los valores de arriba corresponden al equipo local
+        # Los valores de abajo corresponden al equipo visitante
+        colors = []
+        for value in momentum_df['value']:
+            if value > 0:  # Valores positivos = equipo local
+                colors.append(ATLETICO_COLOR if atletico_is_home else RIVAL_COLOR)
+            else:  # Valores negativos = equipo visitante
+                colors.append(ATLETICO_COLOR if atletico_is_away else RIVAL_COLOR)
+    
+        # Dibujar barras con colores asignados
+        ax.bar(momentum_df['minute'], momentum_df['value'], color=colors)
+    
+        # Línea vertical para marcar medio tiempo
+        ax.axvline(45.5, ls=':', color='darkblue')
+    
+        # Configuración de ejes
+        ax.set_xlabel('Minutes', fontsize=14, color="darkblue", weight='bold')
+        ax.set_xticks(range(0, 91, 15))
+        ax.set_xlim(0, 91)
+        ax.tick_params(axis='x', colors="darkblue", size=8)
+        ax.spines['bottom'].set_color('darkblue')
+        ax.spines[['top', 'right', 'left']].set_visible(False)
+        ax.set_yticks([])
+        
+        # ASIGNACIÓN DE COLORES PARA TÍTULO
+        home_color = ATLETICO_COLOR if atletico_is_home else RIVAL_COLOR
+        away_color = ATLETICO_COLOR if atletico_is_away else RIVAL_COLOR
+    
+        # Título
+        plt.figtext(0.35, 0.87, home_team, color=home_color, fontsize=20, weight='bold', ha='right')
+        plt.figtext(0.65, 0.87, away_team, color=away_color, fontsize=20, weight='bold', ha='left')
+        
+        # if save_fig:
+        #    plt.savefig(f'{match_id}_match_momentum.png', bbox_inches='tight')
+    
+        return fig, ax
+    except Exception as e:
+
+        # Capturar cualquier error en la función completa
+        print(f"Error completo en fotmob_match_momentum_plot_atletico: {str(e)}")
+        print(traceback.format_exc())
+        raise e
+    
+# ----------------------------------------------------------------
 # Función red de pases
 
 
@@ -291,36 +412,186 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
         'Most_passes_in_combination': most_pass_count,
     }
 
-    
-
 # ----------------------------------------------------------------
 # Función visualización xG comparación
 
-def plot_xg_comparison(xg_data, local_info, visitante_info):
+def plot_xg_timeline(df_xG):
     """
-    Crea una visualización comparativa de xG.
+    Genera un gráfico de línea de xG acumulado por equipos.
+    
+    Args:
+        df_xG (pd.DataFrame): DataFrame con columnas de xG por equipo
+    
+    Returns:
+        matplotlib.figure.Figure: Figura con el gráfico de xG
     """
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Código para visualizar datos de xG
-    # ... (aquí iría tu implementación específica)
-    
-    plt.title("Comparación de Expected Goals (xG)")
-    
+    # Configurar el estilo del fondo
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(10, 5))
+    fig.patch.set_facecolor('lightgrey')
+    ax.set_facecolor('lightgrey')
+
+    # Identificamos automáticamente los equipos desde los datos
+    equipos = df_xG['Equipo'].unique()
+
+    # Identificar al Atlético (independientemente de su nombre exacto)
+    posibles_nombres_atletico = ['atletico', 'atlético', 'atl madrid', 'atl. madrid', 'atletico madrid', 'atlético madrid', 'atlético de madrid']
+    atletico_nombre = None
+
+    for equipo in equipos:
+        if any(nombre in equipo.lower() for nombre in posibles_nombres_atletico):
+            atletico_nombre = equipo
+            break
+
+    # Si no se encuentra, usar el primer equipo
+    if not atletico_nombre and len(equipos) >= 1:
+        atletico_nombre = equipos[0]
+
+    # Identificar al rival (el equipo que no es el Atlético)
+    rival_nombre = next((equipo for equipo in equipos if equipo != atletico_nombre), None)
+
+    # Definir colores (Atlético siempre en azul, rival siempre en rojo)
+    atleti_color = 'darkblue'
+    other_team_color = 'red'
+
+    # Método simple: el segundo equipo listado en df.Equipo.unique() es el local
+    # El primero es el visitante
+    if len(equipos) >= 2:
+        equipo_visitante = equipos[0]
+        equipo_local = equipos[1]
+    else:
+        equipo_local = equipos[0] if len(equipos) > 0 else "Equipo Local"
+        equipo_visitante = "Equipo Visitante"
+
+    # Ploteamos el xG
+    for team in equipos:
+        team_df = df_xG[df_xG['Equipo'] == team]
+        
+        # Agregamos una fila de 0 xG al inicio del partido
+        team_df = pd.concat([pd.DataFrame({'Equipo': team, 'Minute': 0, 'xG': 0, 'Resultado': 'Gol', 'cumulative_xG': 0, 'half': 1}, index=[0]), team_df])
+        
+        # También agregamos una fila al comienzo de la segunda mitad
+        first_half_xg = team_df[team_df['half'] == 1]['cumulative_xG'].iloc[-1] if not team_df[team_df['half'] == 1].empty else 0
+        team_df = pd.concat([
+            team_df[team_df['half'] == 1], 
+            pd.DataFrame({'Equipo': team, 'Minute': 45, 'xG': 0, 'Resultado': 'Gol', 'cumulative_xG': first_half_xg, 'half': 2}, index=[0]), 
+            team_df[team_df['half'] == 2]
+        ])
+        
+        for half in team_df['half'].unique():
+            half_df = team_df[team_df['half'] == half]
+            # Asignar color basado en el equipo, no en local/visitante
+            team_color = atleti_color if team == atletico_nombre else other_team_color
+            ax.plot(
+                half_df['Minute'], 
+                half_df['cumulative_xG'], 
+                label=team, 
+                drawstyle='steps-post',
+                c=team_color
+            )   
+            
+    # Añadimos un scatter para los goles
+    for team in equipos:
+        team_df = df_xG[(df_xG['Equipo'] == team) & (df_xG['Resultado'] == 'Gol')].to_dict(orient='records')
+        for x in team_df:
+            # Asignar color basado en el equipo, no en local/visitante
+            team_color = atleti_color if team == atletico_nombre else other_team_color
+            ax.scatter(
+                x['Minute'], 
+                x['cumulative_xG'], 
+                c='white',
+                edgecolor=team_color,
+                s=100,
+                # Posicionamos en el tope de las líneas
+                zorder=5
+            )
+            
+            # Incluimos el nombre del goleador
+            ax.text(
+                x['Minute'], 
+                x['cumulative_xG'] - .07, 
+                x['Jugador'], 
+                ha='center', 
+                va='center',
+                weight='bold',
+                color='black', 
+                fontsize=8,
+                zorder=10
+            )
+            
+    # Diferenciamos primera de segunda mitad
+    ax.set_xticks([0, 45, 90])
+    ax.set_xticklabels(['0\'', '45\'', '90\''], color='#4a4a4a')
+    # Agregamos Primera y Segunda parte
+    ax.text(22.5, -.25, 'Primer tiempo', ha='center',  fontsize=12, weight='bold', color='#4a4a4a')
+    ax.text(67.5, -.25, 'Segundo tiempo', ha='center',  fontsize=12, weight='bold', color='#4a4a4a')
+    # Etiquetamos el acumulado
+    ax.set_ylabel('xG Acumulado',  fontsize=12, weight='bold', color='#4a4a4a')
+    # Quitamos las barras de arriba y de derecha
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    # Cambiamos el color de las spines (ejes izquierdo e inferior)
+    ax.spines['left'].set_color('#4a4a4a')
+    ax.spines['bottom'].set_color('#4a4a4a')
+    # Cambiamos el color de los números en los ejes X e Y
+    ax.tick_params(axis='x', colors='#4a4a4a')  # Color de los números del eje X
+    ax.tick_params(axis='y', colors='#4a4a4a')  # Color de los números del eje Y
+
+    # Cambiamos el color de los textos en el título
+    # Nota: Coloreamos los equipos por su identidad, no por local/visitante
+    equipo_local_color = atleti_color if equipo_local == atletico_nombre else other_team_color
+    equipo_visitante_color = atleti_color if equipo_visitante == atletico_nombre else other_team_color
+
+    fig_text(
+        0.5,
+        0.95,
+        f'<{equipo_local}> vs <{equipo_visitante}> \n 2024/25 La Liga', 
+        fontsize=16, 
+        ha='center', 
+        va='center', 
+        ax=ax,      
+        highlight_textprops=[{'color': equipo_local_color}, {'color': equipo_visitante_color}],
+        color='#4a4a4a',
+        weight='bold'
+    )
+
+    plt.tight_layout()
     return fig
 
-def plot_match_momentum(momentum_data, local_name, visitante_name):
+def preprocess_xg_data(df_input):
     """
-    Visualiza el momentum del partido a lo largo del tiempo.
+    Preprocesa los datos de xG para su visualización.
+    
+    Args:
+        df_input (pd.DataFrame): DataFrame original de fbref
+    
+    Returns:
+        pd.DataFrame: DataFrame procesado para visualización de xG
     """
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    # Código para visualizar el momentum
-    # ... (aquí iría tu implementación específica)
-    
-    plt.title(f"Dinámica del partido: {local_name} vs {visitante_name}")
-    
-    return fig
+    # Seleccionamos las columnas del primer apartado llamado 'ACT', 'GCA' en inglés
+    df_processed = df_input.drop(columns=[x for x in df_input.columns if 'ACT' in x[0]])
+
+    df_processed.columns = df_processed.columns.droplevel(0)
+
+    # Filtramos las columnas que queremos
+    df_processed = df_processed[['Equipo', 'Jugador', 'Minute', 'xG', 'Resultado']]
+
+    # Se crea una columna del acumulado
+    df_processed['cumulative_xG'] = df_processed.groupby('Equipo')['xG'].cumsum()
+
+    # Se eliminan filas con minutos nulos
+    df_processed = df_processed.dropna(subset=['Minute'])
+
+    # Diferenciamos primera y segunda parte
+    df_processed['half'] = df_processed['Minute'].apply(lambda x: 1 if int(x.split('+')[0]) <= 45 else 2)
+
+    # Ajustamos los minutos
+    df_processed['Minute'] = df_processed['Minute'].apply(lambda x: sum([int(y) for y in x.split('+')]))
+
+    return df_processed
+
+# ----------------------------------------------------------------
+# Representación de tiros de ambos equipos
 
 def plot_shot_map(shot_data, team_name, team_color="#003366"):
     """
