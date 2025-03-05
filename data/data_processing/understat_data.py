@@ -3,7 +3,13 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 import json
+import re
+import matplotlib.pyplot as plt
+from mplsoccer import Pitch
+import streamlit as st
 
+
+# Función para hoja 2_Visualizacion_24_25.py del xG acumulado de la temporada
 def get_atletico_data():
     """Función única que extrae todos los datos necesarios y los devuelve en el formato esperado"""
     # Primer conjunto de datos (xG, xGA, etc.)
@@ -89,3 +95,98 @@ def get_atletico_data():
         df1.at[i, 'jornada'] = jornada_match
     
     return df_expcGL, df1  # Devolvemos ambos DataFrames
+
+# Funciones extracciones mapa de tiro de partidos
+
+def get_shots_data(match_id):
+    """
+    Obtiene datos de tiros desde Understat para un partido específico
+    
+    Args:
+        match_id (str): ID del partido en Understat
+        
+    Returns:
+        pd.DataFrame: DataFrame con los datos de tiros o None si hay error
+    """
+    print(f"Intentando obtener datos para match_id: {match_id}")
+    url = f'https://understat.com/match/{match_id}'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+    
+    try:
+        print(f"Haciendo solicitud a URL: {url}")
+        response = requests.get(url, headers=headers, timeout=10)
+        print(f"Respuesta obtenida. Status code: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"Error en la respuesta: {response.status_code}")
+            return None
+            
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Verificar si hay scripts
+        scripts = soup.find_all('script')
+        print(f"Número de scripts encontrados: {len(scripts)}")
+        
+        # Buscar shotsData
+        shotsData_found = False
+        for script in scripts:
+            if 'var shotsData' in str(script):
+                shotsData_found = True
+                print("Script con shotsData encontrado")
+                
+                # Extraer la cadena JSON usando expresiones regulares
+                pattern = r'var shotsData\s*=\s*JSON\.parse\(\'(.*?)\'\)'
+                match = re.search(pattern, str(script))
+                if match:
+                    json_str = match.group(1)
+                    # Decodificar la secuencia de escape
+                    json_str = bytes(json_str, 'utf-8').decode('unicode_escape')
+                    data = json.loads(json_str)
+                    
+                    shots = []
+                    for team in ['h', 'a']:
+                        for shot in data[team]:
+                            shots.append({
+                                'x': float(shot['X']) * 100,
+                                'y': float(shot['Y']) * 100,
+                                'player': shot['player'],
+                                'minute': int(shot['minute']),
+                                'result': shot['result'],
+                                'xG': float(shot['xG']),
+                                'team': 'Local' if team == 'h' else 'Visitante'
+                            })
+                    
+                    print(f"Datos procesados. Número de tiros: {len(shots)}")
+                    return pd.DataFrame(shots)
+                else:
+                    print("No se pudo extraer el JSON con regex")
+        
+        if not shotsData_found:
+            print("No se encontró el script con shotsData")
+            
+    except Exception as e:
+        print(f"Error al obtener datos de Understat: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+    
+    return None
+
+def get_shot_map(understat_id):
+    """
+    Obtiene los datos de tiros separados por equipos local y visitante
+    
+    Args:
+        understat_id (str): ID del partido en Understat
+        
+    Returns:
+        dict: Diccionario con claves 'local' y 'visitante' conteniendo DataFrames
+    """
+    shots_df = get_shots_data(understat_id)
+    
+    if shots_df is None or shots_df.empty:
+        return None
+    
+    return {
+        'local': shots_df[shots_df['team'] == 'Local'],
+        'visitante': shots_df[shots_df['team'] == 'Visitante']
+    }

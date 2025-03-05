@@ -23,13 +23,7 @@ def load_teams_mapping():
             try:
                 # Leer el CSV con el delimitador actual
                 df_tm = pd.read_csv(csv_path, sep=';', dtype=str)
-                
-                # Imprimir información de depuración
-                print(f"Leyendo con delimitador: '{delimiter}'")
-                print("Columnas en el CSV:", list(df_tm.columns))
-                print("Primeras filas:")
-                print(df_tm.head())
-                
+                                
                 # Mapeo manual para manejar variaciones de nombres
                 manual_name_mapping = {
                     'Villarreal CF': 'Villarreal CF',
@@ -59,19 +53,12 @@ def load_teams_mapping():
                         'shortname': shortname,
                         'logo_path': logo_path
                     }
-                
-                # Si llegamos aquí, hemos leído el CSV con éxito
-                print("Mapeo de equipos creado:")
-                for k, v in team_mapping.items():
-                    print(f"{k}: {v}")
-                
+                                
                 return team_mapping
             
             except Exception as e:
                 print(f"Error al leer con delimitador '{delimiter}': {e}")
         
-        # Si ningún delimitador funciona
-        print("No se pudo leer el archivo CSV con ningún delimitador conocido")
         return {}
     
     except Exception as e:
@@ -137,8 +124,6 @@ def find_closest_team_name(api_name, team_mapping):
     if best_match:
         return best_match
     
-    # Si no se encuentra, registrar y devolver el nombre original
-    print(f"⚠️ No se encontró coincidencia para el equipo: {api_name}")
     return api_name
 
 def fetch_matches(api_key):
@@ -160,12 +145,7 @@ def fetch_matches(api_key):
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             matches = response.json()['matches']
-            
-            # Código de depuración opcional
-            print("Nombres de equipos en la API:")
-            for match in matches:
-                print(f"Home: {match['homeTeam']['name']}, Away: {match['awayTeam']['name']}")
-            
+                        
             return matches
         return None
     
@@ -279,12 +259,7 @@ def get_atletico_matches(api_key):
     if matches:
         # Cargar el mapeo una sola vez
         team_mapping = load_teams_mapping()
-        
-        # Mostrar los equipos disponibles en el CSV
-        print("Equipos disponibles en el CSV:")
-        for team in team_mapping.keys():
-            print(f"  - {team}")
-        
+                
         # Procesar usando el mismo mapeo
         df_tm = process_matches(matches, team_mapping)
         return transform_dataframe(df_tm, team_mapping)

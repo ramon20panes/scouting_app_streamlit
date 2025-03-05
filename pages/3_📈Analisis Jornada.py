@@ -9,6 +9,7 @@ import traceback
 import os
 import threading
 import time
+import LanusStats as ls
 
 from utils.auth import check_auth, logout
 from common.pdf_export import export_to_pdf, download_pdf_button
@@ -19,12 +20,15 @@ from highlight_text import fig_text
 
 from data.jornada_data.url_mapeo import load_partidos_master, load_equipos_master
 from data.jornada_data.csv_lectura import load_match_stats, load_partido_stats, process_whoscored_event_data, get_passes_df, get_passes_between_df
-from data.jornada_data.func_escraper import get_passing_network, get_xg_data, get_match_momentum, get_shot_map
+
 from utils.visualization_2 import plot_team_metrics, pass_network_visualization, atleti_color, rival_color  
 from utils.visualization_2 import fotmob_match_momentum_plot_atletico
 from utils.visualization_2 import plot_xg_timeline, preprocess_xg_data
+from utils.visualization_2 import plot_shot_map
+from utils.cache import get_fotmob_data, init_cache
 
-
+# Inicializar caché
+init_cache()
 
 # Configuración de la página
 st.set_page_config(
@@ -247,75 +251,24 @@ def main():
             st.subheader("Match Momentum")
 
             # Verificar si estamos en una jornada problemática
-            is_problematic_jornada = selected_jornada in ["2ª", "6ª"]
-
-            if is_problematic_jornada:
-                st.warning(f"La jornada {selected_jornada} puede tener problemas con los datos de momentum.")
-                # Mostrar datos de diagnóstico si es una jornada problemática
-                if st.checkbox("Mostrar información de diagnóstico"):
-                    st.write("Información de la jornada seleccionada:")
-                    st.write(partido_data.to_dict())
+            is_problematic_jornada = False  # Ya no tenemos jornadas problemáticas
 
             try:
                 # Verificar si tenemos ID de FotMob
                 if 'id_fotmob' in partido_data and not pd.isna(partido_data['id_fotmob']):
                     fotmob_id = str(partido_data['id_fotmob'])
-    
-                    # Tratamiento especial para jornadas problemáticas
-                    if selected_jornada in ["2ª", "6ª"]:
-                        st.info(f"Los datos de la jornada {selected_jornada} no están disponibles actualmente. Mostrando visualización estática.")
-    
-                        # Mostrar imagen estática o mensaje informativo
-                        if selected_jornada == "2ª":
-                            st.markdown("""
-                            **Detalles del partido:**
-                            - Este partido no tiene datos de momentum disponibles en FotMob
-                            - Puedes consultar otras visualizaciones como la red de pases o los mapas de tiros
-                            """)
-                        elif selected_jornada == "6ª":
-                            st.markdown("""
-                            **Detalles del partido:**
-                            - Este partido no tiene datos de momentum disponibles en FotMob
-                            - Puedes consultar otras visualizaciones como la red de pases o los mapas de tiros
-                            """)
-                    else:
-                
-                        class TimeoutException(Exception):
-                            pass
-
-                        def check_timeout():
-                            time.sleep(15)  # Esperar 15 segundos
-                            if not getattr(threading.current_thread(), "completed", False):
-                                st.error("La solicitud de datos tardó demasiado tiempo. Por favor, inténtalo de nuevo más tarde.")
-                                st.stop()  # Detener la ejecución
-
-                        # Iniciar un hilo para verificar el timeout
-                        timeout_thread = threading.Thread(target=check_timeout)
-                        timeout_thread.daemon = True
-                        timeout_thread.start()
-
-                        try:
-                            # Crear el gráfico de momentum
-                            with st.spinner("Cargando datos de momentum..."):
-                                fig_mm, ax_mm = get_momentum_with_cache(fotmob_id, debug=False)
-                                st.pyplot(fig_mm)
-        
-                            # Marcar como completado
-                            setattr(timeout_thread, "completed", True)
-        
-                        except Exception as e:
-                            setattr(timeout_thread, "completed", True)  # Marcar como completado aunque haya error
-                            st.error(f"Error al generar el gráfico de momentum: {str(e)}")
-                            st.info("Es posible que este partido no tenga datos de momentum disponibles en FotMob.")
+            
+                    with st.spinner("Cargando datos de momentum..."):
+                        fig_mm, ax_mm = fotmob_match_momentum_plot_atletico(fotmob_id, debug=False)
+                        st.pyplot(fig_mm)
                 else:
                     st.warning(f"No hay ID de FotMob disponible para el partido: {partido_data['equipo_local']} vs {partido_data['equipo_visitante']}")
-                    st.write("Columnas disponibles:", partido_data.index.tolist())
-            
+    
             except Exception as e:
-                st.error(f"Error general: {str(e)}")
-                st.write(traceback.format_exc())
-        
-            # Mapa de redes de pase 
+                st.error(f"Error al generar el gráfico de momentum: {str(e)}")
+                st.info("Es posible que este partido no tenga datos de momentum disponibles en FotMob.")
+
+        # Mapa de redes de pase 
 
         with tab2:
             st.subheader("Redes de pases")
@@ -357,7 +310,8 @@ def main():
                         passes_df=passes_df,
                         home_team=team_info['home_team_name'],
                         away_team=team_info['away_team_name'],
-                        team_color=team_color
+                        team_color=team_color,
+                        jornada=selected_jornada  # Añadir el parámetro jornada
                     )
         
                 plt.tight_layout()
@@ -378,63 +332,88 @@ def main():
                     url_partido = partido_data.get('url_fbref')
             
                     if url_partido:
-                        # Cargar datos de fbref
-                        df_processed = pd.read_html(url_partido, attrs={'id': 'shots_all'})[0]
+                        try:
+                            # Cargar datos de fbref
+                            df_processed = pd.read_html(url_partido, attrs={'id': 'shots_all'})[0]
+                            # Verificar si tennemos datos válidos
+                            if df_processed.empty or df_processed.shape[0] < 2:
+                                st.warning(f"No hay suficientes datos de tiros para la jornada {selected_jornada}")
+                            # Preprocesar datos de xG
+                            else:
+                                df_xG = preprocess_xg_data(df_processed)
+
+                                if df_xG.empty:
+                                    st.warning("No se pudieron procesar los datos xG correctamente")
+                                else:
+                                    # Crear figura de xG
+                                    fig = plot_xg_timeline(df_xG)
                 
-                        # Preprocesar datos de xG
-                        df_xG = preprocess_xg_data(df_processed)
-                
-                        # Crear figura de xG
-                        fig = plot_xg_timeline(df_xG)
-                
-                        # Mostrar figura
-                        st.pyplot(fig)
+                                    # Mostrar figura
+                                    st.pyplot(fig)
+
+                        except Exception as e:
+                            import traceback
+                            st.error(f"Error al procesar datos de xG: {str(e)}")
+                            st.code(traceback.format_exc())
+                            st.warning(f"Estructura de datos no compatible para la jorndad {selected_jornada}")
+
                     else:
                         st.info("No se encontró URL de partido para cargar datos de xG")
         
                 except Exception as e:
+                    import traceback 
                     st.error(f"Error al cargar datos de xG: {str(e)}")
+                    st.code(traceback.format_exc())
         
         # Representación de tiros de ambos equipos
         
         with tab4:
             st.subheader("Mapas de tiros")
-            st.info("Visualización Mapas de Tiros próximamente")
-            """
+    
             with st.spinner("Cargando datos de tiros..."):
                 try:
-                    # Función de caché para mapas de tiros
-                    @st.cache_data(ttl=3600)
-                    def get_cached_shots(id_understat):
-                        return get_shot_map(id_understat)
-                    
-                    id_understat = partido_data.get('id_understat')
-                    if id_understat:
-                        shots_data = get_cached_shots(id_understat)
-                        
-                        if shots_data and local_info and visitante_info:
+                    # Verificar si tenemos ID de Understat
+                    if 'id_understat' in partido_data and not pd.isna(partido_data['id_understat']):
+                        # Convertir a entero y luego a string para eliminar el ".0"
+                        understat_id = str(int(float(partido_data['id_understat'])))
+                
+                        # Función cacheada para obtener datos de tiros
+                        @st.cache_data(ttl=3600)
+                        def get_cached_shots(id_understat):
+                            from data.data_processing.understat_data import get_shot_map
+                            return get_shot_map(id_understat)
+                
+                        # Obtener datos
+                        shots_data = get_cached_shots(understat_id)
+                
+                        if shots_data:
                             col1, col2 = st.columns(2)
+                    
                             with col1:
-                                st.write(f"{equipo_local} - Mapa de tiros")
-                                local_shots_fig = plot_shot_map(shots_data['local'], equipo_local)
+                                local_shots_fig = plot_shot_map(shots_data['local'], partido_data['equipo_local'])
                                 st.pyplot(local_shots_fig)
-                            
+                    
                             with col2:
-                                st.write(f"{equipo_visitante} - Mapa de tiros")
-                                visitante_shots_fig = plot_shot_map(shots_data['visitante'], equipo_visitante)
-                                st.pyplot(visitante_shots_fig)
+                                visitante_shots_fig = plot_shot_map(shots_data['visitante'], partido_data['equipo_visitante'])
+                                st.pyplot(visitante_shots_fig)                                      
+                            
                         else:
-                            st.info("Datos de tiros no disponibles para este partido")
+                            st.warning(f"No se pudieron obtener datos de tiros para el partido: {partido_data['equipo_local']} vs {partido_data['equipo_visitante']}")
+                            st.info("Es posible que este partido no tenga datos disponibles en Understat.")
                     else:
-                        st.info("No se encontró ID de Understat para este partido")
+                        st.warning("No hay ID de Understat disponible para este partido")
+        
                 except Exception as e:
                     st.error(f"Error al cargar mapas de tiros: {str(e)}")
-        """
-    
+                    st.code(traceback.format_exc())
+
     except Exception as e:
-        st.error(f"Error general: {str(e)}")
-        import traceback
-        st.write(traceback.format_exc())
+        st.error(f"Error general en la aplicación: {str(e)}")
+        if 'traceback' in globals():
+            st.code(traceback.format_exc())
+        else:
+            import traceback
+            st.code(traceback.format_exc())
 
 # Ejecutar la función principal
 main()

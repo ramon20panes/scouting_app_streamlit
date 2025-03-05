@@ -7,15 +7,13 @@ from matplotlib.colors import to_rgba
 
 import streamlit as st
 import seaborn as sns
-from data.jornada_data.csv_lectura import normalize_team_name   # Ajusta la ruta según tu estructura de directorios
+from data.jornada_data.csv_lectura import normalize_team_name
+from utils.cache import get_fotmob_data
 from PIL import Image
 import io
 import traceback
-
 from highlight_text import fig_text
-
 import LanusStats as ls
-
 from mplsoccer import Pitch
 
 
@@ -179,36 +177,39 @@ def fotmob_match_momentum_plot_atletico(match_id, save_fig=False, debug=False):
     - Atlético siempre en azul oscuro, rival siempre en rojo
     """
     try:
-    
         # Inicializar FotMob
-        fotmob = ls.FotMob()
-
         if debug:
-                print(f"Inicializando FotMob para match_id: {match_id}")
+            print(f"Inicializando FotMob para match_id: {match_id}")
     
         # Colores fijos
         ATLETICO_COLOR = '#172790'  # Color para el Atlético (azul oscuro)
         RIVAL_COLOR = '#e60000'     # Color para el rival (rojo)
     
-        # Obtener datos
+        # Obtener datos usando la función cacheada
         try:
-            response = fotmob.request_match_details(match_id)
-            if debug:
-                print(f"Respuesta obtenida. Status code: {response.status_code}")
-        except Exception as e:
-            raise Exception(f"Error al solicitar datos del partido {match_id}: {str(e)}")
-        
-        try:
-            response_json = response.json()
+            response_json = get_fotmob_data(match_id)
             if debug:
                 print("Respuesta JSON procesada correctamente")
         except Exception as e:
-            raise Exception(f"Error al procesar JSON para partido {match_id}: {str(e)}")
+            raise Exception(f"Error al solicitar datos del partido {match_id}: {str(e)}")
     
         # Obtener nombres de equipos
         try:
-            home_team = response_json['general']['homeTeam']['name']
-            away_team = response_json['general']['awayTeam']['name']
+            # Intentar obtener nombres de equipos desde la estructura 'general'
+            if 'general' in response_json:
+                home_team = response_json['general']['homeTeam']['name']
+                away_team = response_json['general']['awayTeam']['name']
+            # Intentar obtener desde estructura alternativa (match.teams)
+            elif 'match' in response_json and 'teams' in response_json['match']:
+                home_team = response_json['match']['teams'][0]['name']
+                away_team = response_json['match']['teams'][1]['name']
+            # Última alternativa si existe 'header'
+            elif 'header' in response_json:
+                home_team = response_json['header']['teams'][0]['name']
+                away_team = response_json['header']['teams'][1]['name']
+            else:
+                raise Exception("No se pudo encontrar información de equipos en la respuesta JSON")
+                
             if debug:
                 print(f"Equipos obtenidos: {home_team} vs {away_team}")
         except Exception as e:
@@ -224,17 +225,28 @@ def fotmob_match_momentum_plot_atletico(match_id, save_fig=False, debug=False):
             print(f"Atlético is home: {atletico_is_home}")
             print(f"Atlético is away: {atletico_is_away}")
     
-        # Obtener datos de momentum
+        # Obtener datos de momentum (diferentes rutas en JSON)
         try:
-            momentum_data = response_json['content']['matchFacts']['momentum']['main']['data']
+            # Intentar ruta principal
+            if 'content' in response_json and 'matchFacts' in response_json['content'] and 'momentum' in response_json['content']['matchFacts']:
+                momentum_data = response_json['content']['matchFacts']['momentum']['main']['data']
+            # Intentar ruta alternativa
+            elif 'momentum' in response_json:
+                momentum_data = response_json['momentum']['main']['data']
+            # Otra posible ruta
+            elif 'stats' in response_json and 'momentum' in response_json['stats']:
+                momentum_data = response_json['stats']['momentum']['main']['data']
+            else:
+                raise Exception("No se encontraron datos de momentum en la respuesta JSON")
+                
             momentum_df = pd.DataFrame(momentum_data)
         
             if debug:
                 print("\nPrimeros valores del DataFrame:")
                 print(momentum_df.head())
                 print(f"\nRango de valores: {momentum_df['value'].min()} a {momentum_df['value'].max()}")
-        except:
-            raise Exception(f"El partido {match_id} no tiene datos de momentum")
+        except Exception as e:
+            raise Exception(f"El partido {match_id} no tiene datos de momentum: {str(e)}")
     
         # Crear figura base
         fig, ax = plt.subplots(figsize=(16, 9), facecolor='#d4d4d4')
@@ -254,14 +266,14 @@ def fotmob_match_momentum_plot_atletico(match_id, save_fig=False, debug=False):
         ax.bar(momentum_df['minute'], momentum_df['value'], color=colors)
     
         # Línea vertical para marcar medio tiempo
-        ax.axvline(45.5, ls=':', color='darkblue')
+        ax.axvline(45.5, ls=':', color='#000000')
     
         # Configuración de ejes
-        ax.set_xlabel('Minutes', fontsize=14, color="darkblue", weight='bold')
+        ax.set_xlabel('Minutes', fontsize=14, color="#000000", weight='bold')
         ax.set_xticks(range(0, 91, 15))
         ax.set_xlim(0, 91)
-        ax.tick_params(axis='x', colors="darkblue", size=8)
-        ax.spines['bottom'].set_color('darkblue')
+        ax.tick_params(axis='x', colors="#000000", size=8)
+        ax.spines['bottom'].set_color('#000000')
         ax.spines[['top', 'right', 'left']].set_visible(False)
         ax.set_yticks([])
         
@@ -298,7 +310,7 @@ atleti_color = '#172790'
 rival_color = '#e60000'
 
 def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df, teamName, 
-                               passes_df=None, home_team=None, away_team=None, team_color=None):
+                               passes_df=None, home_team=None, away_team=None, team_color=None, jornada=None):
     # Definir colores base
     atleti_color = '#172790'  # Azul oscuro para el Atlético de Madrid
     rival_color = '#e60000'   # Rojo para el equipo rival
@@ -309,8 +321,17 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     if team_color is None:
         team_color = atleti_color  # Color predeterminado si no se proporciona
     
-    # Determinar si es el equipo local o visitante
-    is_home_team = teamName == home_team
+    # Corrección específica para jornada 26
+    is_atleti = False
+    if jornada == "26ª":
+        # Chequeo explícito para Atlético vs Athletic
+        is_atleti = "Atletico" in teamName or "Atlético" in teamName
+        is_home_team = "Atletico" in teamName or "Atlético" in teamName
+    else:
+        # Determinar si es el equipo local o visitante
+        is_home_team = teamName == home_team
+        # Determinar si es Atlético
+        is_atleti = "Atletico" in teamName or "Atlético" in teamName
 
     MAX_LINE_WIDTH = 15
     passes_between_df['width'] = (passes_between_df.pass_count / passes_between_df.pass_count.max() * MAX_LINE_WIDTH)
@@ -335,16 +356,16 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     for index, row in average_locs_and_count_df.iterrows():
         if row['isFirstEleven'] == True:
             pitch.scatter(row['pass_avg_x'], row['pass_avg_y'], s=1000, marker='o', 
-                          color=bg_color, edgecolor=line_color, linewidth=2, alpha=1, ax=ax)
+                          color=bg_color, edgecolor=line_color, linewidth=1, alpha=1, ax=ax)
         else:
             pitch.scatter(row['pass_avg_x'], row['pass_avg_y'], s=1000, marker='s', 
-                          color=bg_color, edgecolor=line_color, linewidth=2, alpha=0.75, ax=ax)
+                          color=bg_color, edgecolor=line_color, linewidth=1, alpha=0.75, ax=ax)
 
     # Plot de los nombres
     for index, row in average_locs_and_count_df.iterrows():
         player_name = row["name"].split()[-1]
         pitch.annotate(player_name, xy=(row.pass_avg_x, row.pass_avg_y), c=team_color, 
-                       ha='center', va='center', size=9, weight='bold', ax=ax)
+                       ha='center', va='center', size=10, weight='bold', ax=ax)
 
     # Linea que marca la altura media de los pases
     avgph = round(average_locs_and_count_df['pass_avg_x'].median(), 2)
@@ -389,18 +410,18 @@ def pass_network_visualization(ax, passes_between_df, average_locs_and_count_df,
     # Para el equipo local (siempre a la izquierda)
     if is_home_team:
         # No invertir ejes
-        ax.text(avgph-1, -5, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='right')
-        ax.text(105, -5, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='right')
+        ax.text(avgph-1, -5, f"Altura media:{avgph}m", fontsize=15, color="#000000", ha='right')
+        ax.text(105, -5, f"Verticalidad: {verticality}%", fontsize=15, color="#000000", ha='right')
         ax.text(2, 66, "Círculo = Tit\nCuadrado = Sup", color=team_color, size=12, ha='left', va='top')
-        ax.set_title(f"{teamName}", color=line_color, size=25, fontweight='bold')
+        ax.set_title(f"{teamName}", color="#000000", size=25, fontweight='bold')
     else:
         # Para visitante (siempre a la derecha), invertir los ejes
         ax.invert_xaxis()
         ax.invert_yaxis()
-        ax.text(avgph-1, 73, f"Altura media:{avgph}m", fontsize=15, color=line_color, ha='left')
-        ax.text(105, 73, f"Verticalidad: {verticality}%", fontsize=15, color=line_color, ha='left')
+        ax.text(avgph-1, 73, f"Altura media:{avgph}m", fontsize=15, color="#000000", ha='left')
+        ax.text(105, 73, f"Verticalidad: {verticality}%", fontsize=15, color="#000000", ha='left')
         ax.text(2, 2, "Círculo = Tit\nCuadrado = Sup", color=team_color, size=12, ha='right', va='top')
-        ax.set_title(f"{teamName}", color=line_color, size=25, fontweight='bold')
+        ax.set_title(f"{teamName}", color="#000000", size=25, fontweight='bold')
 
     # Devuelve las estadísticas 
     return {
@@ -434,6 +455,12 @@ def plot_xg_timeline(df_xG):
     # Identificamos automáticamente los equipos desde los datos
     equipos = df_xG['Equipo'].unique()
 
+     # Verificar que tenemos datos
+    if len(equipos) < 1:
+        ax.text(0.5, 0.5, "No hay datos de xG disponibles", 
+                ha='center', va='center', fontsize=14, color='black')
+        return fig
+
     # Identificar al Atlético (independientemente de su nombre exacto)
     posibles_nombres_atletico = ['atletico', 'atlético', 'atl madrid', 'atl. madrid', 'atletico madrid', 'atlético madrid', 'atlético de madrid']
     atletico_nombre = None
@@ -448,20 +475,31 @@ def plot_xg_timeline(df_xG):
         atletico_nombre = equipos[0]
 
     # Identificar al rival (el equipo que no es el Atlético)
-    rival_nombre = next((equipo for equipo in equipos if equipo != atletico_nombre), None)
+    rival_nombre = next((equipo for equipo in equipos if equipo != atletico_nombre), "Rival")
 
     # Definir colores (Atlético siempre en azul, rival siempre en rojo)
     atleti_color = 'darkblue'
     other_team_color = 'red'
 
-    # Método simple: el segundo equipo listado en df.Equipo.unique() es el local
-    # El primero es el visitante
-    if len(equipos) >= 2:
-        equipo_visitante = equipos[0]
-        equipo_local = equipos[1]
+    # Determinar local y visitante basándonos en el dataset
+    # Intentemos determinar quién es local y visitante
+    equipo_local = None
+    equipo_visitante = None
+    
+    # Buscar en los eventos para detectar quién es local y visitante
+    local_rows = df_xG[df_xG['Local'] == True] if 'Local' in df_xG.columns else pd.DataFrame()
+    if not local_rows.empty:
+        # Tenemos información directa de local/visitante
+        equipo_local = local_rows['Equipo'].iloc[0]
+        equipo_visitante = next((eq for eq in equipos if eq != equipo_local), "Visitante")
+    elif len(equipos) >= 2:
+        # Adivinamos basándonos en el orden: primero se suele listar al local
+        equipo_local = equipos[0]
+        equipo_visitante = equipos[1]
     else:
-        equipo_local = equipos[0] if len(equipos) > 0 else "Equipo Local"
-        equipo_visitante = "Equipo Visitante"
+        # Si no podemos determinar, usamos Atlético y Rival
+        equipo_local = atletico_nombre or "Local"
+        equipo_visitante = rival_nombre or "Visitante"
 
     # Ploteamos el xG
     for team in equipos:
@@ -521,21 +559,21 @@ def plot_xg_timeline(df_xG):
             
     # Diferenciamos primera de segunda mitad
     ax.set_xticks([0, 45, 90])
-    ax.set_xticklabels(['0\'', '45\'', '90\''], color='#4a4a4a')
+    ax.set_xticklabels(['0\'', '45\'', '90\''], color='#000000')
     # Agregamos Primera y Segunda parte
-    ax.text(22.5, -.25, 'Primer tiempo', ha='center',  fontsize=12, weight='bold', color='#4a4a4a')
-    ax.text(67.5, -.25, 'Segundo tiempo', ha='center',  fontsize=12, weight='bold', color='#4a4a4a')
+    ax.text(22.5, -.25, 'Primer tiempo', ha='center',  fontsize=12, weight='bold', color='#000000')
+    ax.text(67.5, -.25, 'Segundo tiempo', ha='center',  fontsize=12, weight='bold', color='#000000')
     # Etiquetamos el acumulado
-    ax.set_ylabel('xG Acumulado',  fontsize=12, weight='bold', color='#4a4a4a')
+    ax.set_ylabel('xG Acumulado',  fontsize=12, weight='bold', color='#000000')
     # Quitamos las barras de arriba y de derecha
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     # Cambiamos el color de las spines (ejes izquierdo e inferior)
-    ax.spines['left'].set_color('#4a4a4a')
-    ax.spines['bottom'].set_color('#4a4a4a')
+    ax.spines['left'].set_color('#000000')
+    ax.spines['bottom'].set_color('#000000')
     # Cambiamos el color de los números en los ejes X e Y
-    ax.tick_params(axis='x', colors='#4a4a4a')  # Color de los números del eje X
-    ax.tick_params(axis='y', colors='#4a4a4a')  # Color de los números del eje Y
+    ax.tick_params(axis='x', colors='#000000')  # Color de los números del eje X
+    ax.tick_params(axis='y', colors='#000000')  # Color de los números del eje Y
 
     # Cambiamos el color de los textos en el título
     # Nota: Coloreamos los equipos por su identidad, no por local/visitante
@@ -545,7 +583,7 @@ def plot_xg_timeline(df_xG):
     fig_text(
         0.5,
         0.95,
-        f'<{equipo_local}> vs <{equipo_visitante}> \n 2024/25 La Liga', 
+        f'<{equipo_local}> vs <{equipo_visitante}>', 
         fontsize=16, 
         ha='center', 
         va='center', 
@@ -582,28 +620,115 @@ def preprocess_xg_data(df_input):
     # Se eliminan filas con minutos nulos
     df_processed = df_processed.dropna(subset=['Minute'])
 
-    # Diferenciamos primera y segunda parte
-    df_processed['half'] = df_processed['Minute'].apply(lambda x: 1 if int(x.split('+')[0]) <= 45 else 2)
+    # Manejar diferentes formatos de minutos
+    def parse_minute(minute_value):
+        # Si es un número (float o int), simplemente convertirlo a int
+        if isinstance(minute_value, (int, float)):
+            return 2 if int(minute_value) > 45 else 1, int(minute_value)
+        
+        # Si es una cadena, intentar procesarla
+        try:
+            # Manejar formato "45+2" o similar
+            if '+' in str(minute_value):
+                parts = str(minute_value).split('+')
+                base_minute = int(parts[0])
+                extra_minute = int(parts[1])
+                total_minute = base_minute + extra_minute
+            else:
+                # Si no tiene "+", convertir directamente
+                total_minute = int(minute_value)
+                
+            # Determinar mitad
+            half = 2 if total_minute > 45 else 1
+            return half, total_minute
+        except Exception as e:
+            # En caso de error, asumir primera mitad y minuto 1
+            print(f"Error procesando minuto '{minute_value}': {str(e)}")
+            return 1, 1
 
-    # Ajustamos los minutos
-    df_processed['Minute'] = df_processed['Minute'].apply(lambda x: sum([int(y) for y in x.split('+')]))
+    # Aplicar la función de procesamiento de minutos
+    df_processed['half'], df_processed['Minute_processed'] = zip(*df_processed['Minute'].apply(parse_minute))
+    
+    # Reemplazar la columna original
+    df_processed['Minute'] = df_processed['Minute_processed']
+    df_processed.drop(columns=['Minute_processed'], inplace=True)
 
     return df_processed
 
 # ----------------------------------------------------------------
 # Representación de tiros de ambos equipos
 
-def plot_shot_map(shot_data, team_name, team_color="#003366"):
+def plot_shot_map(shots_df, team_name, team_color=None):
     """
-    Crea un mapa de tiros para un equipo.
+    Crea un mapa de tiros para un equipo
+    
+    Args:
+        shots_df (pd.DataFrame): DataFrame con los datos de tiros
+        team_name (str): Nombre del equipo
+        team_color (str, optional): Color para representar los tiros. Por defecto es None.
+        
+    Returns:
+        matplotlib.figure.Figure: Figura con el mapa de tiros
     """
-    fig, ax = plt.subplots(figsize=(10, 8))
+    if shots_df is None or shots_df.empty:
+        fig, ax = plt.subplots(figsize=(10, 7))
+        ax.text(0.5, 0.5, "No hay datos de tiros disponibles", ha='center', va='center', fontsize=14)
+        ax.axis('off')
+        return fig
     
-    # Código para crear el mapa de tiros
-    # ... (aquí iría tu implementación específica)
+    # Determinar si es el Atlético de Madrid para establecer colores
+    is_atleti = any(name in team_name.lower() for name in ['atl', 'atlético', 'atletico'])
     
-    plt.title(f"Mapa de tiros - {team_name}")
+    # Configurar colores
+    if team_color is None:
+        team_color = '#172790' if is_atleti else '#e60000'  # Azul para Atleti, rojo para rival
     
+    # Crear figura
+    fig, ax = plt.subplots(figsize=(10, 7), facecolor='#F0F0F0')
+    
+    # Configurar campo
+    pitch = Pitch(pitch_type='opta', pitch_length=100, pitch_width=100,
+                 pitch_color='#FFFFFF', line_color='#333333', stripe=True,
+                 stripe_color='#F8F8F8', half=True)
+    
+    pitch.draw(ax=ax)
+    
+    # Dibujar tiros
+    for _, shot in shots_df.iterrows():
+        is_goal = shot['result'] == 'Goal'
+        size = shot['xG'] * 1500  # Tamaño basado en xG
+        
+        ax.scatter(
+            shot['x'],
+            shot['y'],
+            c=team_color,
+            s=size,
+            alpha=0.7,
+            edgecolors='black',
+            linewidth=2 if is_goal else 1,
+            marker='*' if is_goal else 'o'
+        )
+    
+    # Título y estadísticas
+    ax.set_title(f"{team_name}", color='#333333', fontsize=16, weight='bold')
+    
+    # Leyenda
+    legend_elements = [
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=team_color, 
+                  markersize=10, label='Tiro'),
+        plt.Line2D([0], [0], marker='*', color='w', markerfacecolor=team_color, 
+                  markersize=15, label='Gol')
+    ]
+    ax.legend(handles=legend_elements, loc='upper center', frameon=True)
+    
+    # Estadísticas
+    stats_text = (f"Tiros: {len(shots_df)} | "
+                 f"Goles: {len(shots_df[shots_df['result'] == 'Goal'])} | "
+                 f"xG Total: {shots_df['xG'].sum():.2f}")
+    
+    plt.figtext(0.5, 0.02, stats_text, ha='center', color='#333333', weight='bold')
+    
+    plt.tight_layout()
     return fig
 
 def draw_pitch(ax, half=False):

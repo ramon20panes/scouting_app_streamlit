@@ -49,11 +49,7 @@ def load_match_stats(match_id=None, jornada=None, partido=None):
     # Cargar el CSV
     try:
         df = pd.read_csv(file_path)
-        
-        # Mostrar las columnas disponibles y ejemplos para depuración
-        print(f"Columnas en CSV: {df.columns.tolist()}")
-        print(f"Ejemplos de partidos: {df['Partido'].unique()[:5]}")
-        
+                
         # Filtrar por jornada si se proporciona
         if jornada is not None:
             # Convertir a int si es posible
@@ -602,7 +598,6 @@ def get_passes_df(df):
 
     return df_passes
 
-# Actualiza esta función o añádela si no existe
 def get_passes_between_df(teamName, passes_df, players_df, events_df):
     """
     Obtiene información de pases entre jugadores y sus posiciones medias
