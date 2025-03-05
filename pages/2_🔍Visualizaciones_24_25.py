@@ -145,12 +145,19 @@ with tab2:
     
     @st.cache_data(ttl=3600)
     def load_atletico_matches():    
-        # Cargar API key desde variables de entorno
-        load_dotenv()
-        api_key = os.getenv("FOOTBALL_DATA_API_KEY")
+        # Intentar obtener la API key de Streamlit secrets o variables de entorno
+        try:
+            # Primero intentar obtener de Streamlit secrets
+            api_key = st.secrets["FOOTBALL_DATA_API_KEY"]
+        except:
+            # Si falla, intentar obtener de variables de entorno
+            from dotenv import load_dotenv
+            import os
+            load_dotenv()
+            api_key = os.getenv("FOOTBALL_DATA_API_KEY")
     
         if not api_key:
-            st.error("No se encontró la API Key para football-data.org. Verifica tu archivo .env")
+            st.error("No se encontró la API Key para football-data.org. Verifica tus secrets o .env")
             return None
     
         return get_atletico_matches(api_key)
