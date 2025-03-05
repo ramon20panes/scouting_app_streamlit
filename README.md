@@ -70,7 +70,7 @@ Posibles dos nuevas páginas en un futuro.
 
 - **README.md**
 
-- requiretments.txt**
+- **requiretments.txt**
 
 ## Tecnologías
 - Python + Streamlit
