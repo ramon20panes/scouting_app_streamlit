@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 from utils.styles import load_all_styles
 from utils.visualization import create_bumpy_chart 
 
+from data.api_handlers.football_data_api import load_teams_mapping
+
 from utils.visualization import create_bumpy_chart, create_match_timeline
 from data.api_handlers.football_data_api import load_teams_mapping, get_atletico_matches
 
@@ -81,8 +83,8 @@ with col_title:
     """, unsafe_allow_html=True)
 
 with col_logo:
-    # Añadir espacio antes de la imagen
-    st.write("")  # Esto añade un pequeño espacio vertical
+    
+    st.write("")
     st.image(ESCUDO_PATH, width=70)
 
 # Reducir el espacio antes de los tabs
@@ -100,6 +102,7 @@ div[data-testid="stTabContent"] {
 </style>
 """, unsafe_allow_html=True)
 
+# ----------------------------------------------------------------
 # Crear tabs para las diferentes visualizaciones
 tab1, tab2, tab3 = st.tabs(["Clasificación LaLiga", "Timeline Partidos", "Expected Goals (xG)"])
 
@@ -156,8 +159,7 @@ with tab2:
         matches_df = load_atletico_matches()
         
         if matches_df is not None and not matches_df.empty:
-            # Cargar el mapeo de equipos
-            from data.api_handlers.football_data_api import load_teams_mapping
+            
             team_mapping = load_teams_mapping()
             
             # Crear y mostrar el timeline
@@ -205,7 +207,6 @@ with tab3:
         st.error(f"Error al cargar o procesar los datos de xG: {str(e)}")
         st.error("Asegúrate de tener instalada la librería 'lxml' y 'highlight-text': pip install lxml highlight-text")
 
-# Obtener el nombre de la página actual
 current_page = __file__.split('\\')[-1]
 
 # Inicializar y actualizar el historial
@@ -216,7 +217,10 @@ if "page_history" not in st.session_state:
 if not st.session_state.page_history or st.session_state.page_history[-1] != current_page:
     st.session_state.page_history.append(current_page)
 
+
+# ----------------------------------------------------------------
 # Crear contenedor para botón de PDF y footer sin línea divisoria
+
 st.markdown("---")
 footer_container = st.container()
 
@@ -229,22 +233,22 @@ with footer_container:
             try:
                 # Obtener figuras actuales
                 figures = {}
-        
-                # 1. Clasificación (Tab 1) - Con diagnóstico detallado
+    
+                # 1. Clasificación (Tab 1) 
                 try:
                     if "highlight_teams" in st.session_state and df_cla is not None:
-                                
+                            
                         # Buscar si hay alguna columna que podría contener nombres de equipos
                         possible_team_columns = [col for col in df_cla.columns if any(word in col.lower() for word in ['equipo', 'team', 'club', 'nombre'])]
-                                
+                            
                         # Intentar adaptar el DataFrame antes de llamar a create_bumpy_chart
                         df_cla_copy = df_cla.copy()
-        
+    
                         # Si no existe 'Equipo' pero hay columnas similares, renombrar la primera
                         if 'Equipo' not in df_cla.columns and possible_team_columns:
                             df_cla_copy.rename(columns={possible_team_columns[0]: 'Equipo'}, inplace=True)
                             st.write(f"Renombrando columna {possible_team_columns[0]} a 'Equipo'")
-        
+    
                         # Generar el gráfico con el DataFrame adaptado
                         fig1, _ = create_bumpy_chart(df_cla_copy, st.session_state.highlight_teams)
                         figures["Clasificación LaLiga"] = fig1
@@ -259,47 +263,47 @@ with footer_container:
                             figures["Timeline Partidos"] = fig2
                 except Exception as e:
                     st.warning(f"No se pudo incluir el gráfico de timeline: {str(e)}")
-            
+        
                 # 3. Análisis xG (Tab 3)
                 try:
                     # Obtener datos frescos usando tu función
-                    
+                
                     df_expcGL_xg, df1_xg = get_atletico_data()
                     fig3 = plot_atletico_xg_differential(df_expcGL, df1_xg)
                     figures["Análisis xG"] = fig3
                 except Exception as e:
                     st.warning(f"No se pudo incluir el gráfico xG: {str(e)}")
 
-                # IMPORTANTE: Solo texto en pdf_data, no DataFrames
+                # Datos del PDF
                 pdf_data = {
-                    "Información General": "Visualizaciones Atlético de Madrid temporada 24/25",
-                    "Clasificación LaLiga": "Evolución de posiciones en la liga durante la temporada actual",
+                    "Clasificación LaLiga": "Análisis de la evolución de posiciones en la liga",
                     "Timeline Partidos": "Calendario y resultados de partidos disputados",
-                    "Análisis xG": "Análisis de Expected Goals por jornada"
+                    "Análisis xG": "Análisis de Expected Goals acumulado durante la temporada"
                 }
 
                 # Generar PDF
                 pdf_bytes = export_to_pdf(
-                    pdf_data,  # Solo texto
-                    figures=figures,  # Figuras por separado
-                    filename=f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf",
+                    pdf_data,  
+                    figures=figures,  
+                    filename=f"Gráficas ATM 24/25 {datetime.now().strftime('%d%m%Y')}.pdf",
                     title="Informe Atlético de Madrid - Visualizaciones 24/25"
                 )
 
-                # Mostrar botón de descarga
+                # Guardar PDF en session_state
                 st.session_state.pdf_bytes = pdf_bytes
-                st.session_state.pdf_filename = f"Gráfico_Atleti{datetime.now().strftime('%d%m%Y')}.pdf"
+                st.session_state.pdf_filename = f"Gráficas ATM 24/25 {datetime.now().strftime('%d%m%Y')}.pdf"
                 st.success("PDF generado correctamente")
 
             except Exception as e:
                 st.error(f"Error al generar el PDF: {str(e)}")
-
-                 # Si hay un PDF generado, mostrar el botón de descarga
+                import traceback
+                st.error(traceback.format_exc())
+            
+        # Si hay un PDF generado, mostrar botón de descarga
         if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
             download_pdf_button(
                 st.session_state.pdf_bytes,
-                filename=st.session_state.pdf_filename
-            )
+                filename=st.session_state.pdf_filename)
     
     # Columna central - Espacio vacío
     with footer_cols[1]:

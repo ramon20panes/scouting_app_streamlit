@@ -90,7 +90,7 @@ def get_match_urls(match_id):
     """
     partidos_df = load_partidos_master()
     
-    # Buscar por las posibles columnas de ID
+    # Busca por las posibles columnas de ID
     for id_col in ['id_whoscored', 'id_fotmob']:
         if id_col in partidos_df.columns and match_id in partidos_df[id_col].values:
             match_row = partidos_df[partidos_df[id_col] == match_id].iloc[0]

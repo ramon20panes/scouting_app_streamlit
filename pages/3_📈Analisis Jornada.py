@@ -89,8 +89,8 @@ with col_title:
     """, unsafe_allow_html=True)
 
 with col_logo:
-    st.write("")  # Esto añade un pequeño espacio vertical
-    st.image(ESCUDO_PATH, width=70)  # Reducir el tamaño del escudo
+    st.write("")  
+    st.image(ESCUDO_PATH, width=70)  
 
 # Reducir el espacio antes de los tabs
 st.markdown("""
@@ -141,9 +141,10 @@ def get_momentum_with_cache(fotmob_id, debug=False):
     except Exception as e:
         raise e
 
+# ----------------------------------------------------------------
 # CONTENIDO ESPECÍFICO DE LA PÁGINA - ANÁLISIS POR JORNADA
 def main():
-    # 1. Cargar datos maestros
+    # Cargar datos maestros
     try:
         partidos_df = load_partidos_master()
         equipos_df = load_equipos_master()
@@ -152,7 +153,10 @@ def main():
             st.error("No se pudieron cargar los datos maestros")
             return
         
-        # 2. Selector de jornada con persistencia
+        st.session_state.partidos_df = partidos_df
+        st.session_state.equipos_df = equipos_df
+
+        # Selector de jornada con persistencia
         jornadas = partidos_df['formato_jornada'].tolist()
     
         # Inicializar session_state si no existe
@@ -166,7 +170,7 @@ def main():
         try:
             default_index = jornadas.index(st.session_state.selected_jornada)
         except ValueError:
-            default_index = 0  # Si la jornada guardada no está disponible, usar la primera
+            default_index = 0  
     
         # Mostrar el selectbox con el valor guardado seleccionado
         selected_jornada = st.selectbox(
@@ -181,7 +185,7 @@ def main():
             st.session_state.prev_selected_jornada = selected_jornada
             st.session_state.selected_jornada = selected_jornada
             
-        # 3. Obtener datos del partido
+        # Obtener datos del partido
         partido_row = partidos_df[partidos_df['formato_jornada'] == selected_jornada]
         if partido_row.empty:
             st.error(f"No se encontró información para la jornada: {selected_jornada}")
@@ -189,7 +193,7 @@ def main():
             
         partido_data = partido_row.iloc[0]
         
-        # 4. Mostrar información básica del partido
+        # Mostrar información básica del partido
         jornada_num = partido_data['Jornada']
         equipo_local = partido_data['equipo_local']
         equipo_visitante = partido_data['equipo_visitante']
@@ -197,7 +201,7 @@ def main():
         st.write(f"Jornada: {jornada_num}")
         st.write(f"Partido: {equipo_local} vs {equipo_visitante}")
         
-        # 5. Buscar información de equipos para los escudos
+        # Buscar información de equipos para los escudos
         local_row = equipos_df[equipos_df['nombre'].str.strip() == equipo_local.strip()]
         visitante_row = equipos_df[equipos_df['nombre'].str.strip() == equipo_visitante.strip()]
         
@@ -216,7 +220,7 @@ def main():
             if ' ruta_escudo' in visitante_info:
                 visitante_info['ruta_escudo'] = visitante_info[' ruta_escudo'].strip("'")
                 
-        # 7. Cargar estadísticas del partido
+        # Cargar estadísticas del partido
         partido_str = f"{equipo_local}-{equipo_visitante}"
         
         # Cargar estadísticas usando nuestra función mejorada
@@ -234,7 +238,7 @@ def main():
 
         # ----------------------------------------------------------------
         
-        # 8. SECCIÓN DE VISUALIZACIONES - USANDO TABS
+        # SECCIÓN DE VISUALIZACIONES - USANDO TABS
         st.header("Visualizaciones avanzadas")
         
         # Crear opciones de visualización como pestañas
@@ -418,6 +422,7 @@ def main():
 # Ejecutar la función principal
 main()
 
+# ----------------------------------------------------------------
 # Crear contenedor para botón de PDF y footer sin línea divisoria
 st.markdown("---")
 footer_container = st.container()
@@ -425,34 +430,184 @@ footer_container = st.container()
 with footer_container:
    
     footer_cols = st.columns([1, 2, 1])
-    
+
     # Columna izquierda - Botón PDF con texto incluido
     with footer_cols[0]:
         if st.button("📑 Exportar Informe PDF", key="generate_pdf"):
-            pdf_data = {
-                "Información General": "Visualizaciones Atlético de Madrid temporada 24/25",
-                "Gráficos": "Resumen de visualizaciones generadas",
-                # Añade los datos específicos de esta página
-            }
+            try:
+                # Verificar que tenemos session_state con datos
+                if 'partidos_df' not in st.session_state or 'selected_jornada' not in st.session_state:
+                    st.warning("No hay datos disponibles. Por favor, cargue la página correctamente.")
+                else:
+                    # Usar datos de session_state
+                    partidos_df = st.session_state.partidos_df
+                    selected_jornada = st.session_state.selected_jornada
 
-            # Generar PDF
-            pdf_bytes = export_to_pdf(
-                pdf_data, 
-                filename=f"informe_atm_{datetime.now().strftime('%d%m%Y')}.pdf",
-                title="Informe Atlético de Madrid - Métricas 24/25"
-            )
+                # Verificar que tenemos una jornada seleccionada
+                if 'selected_jornada' not in st.session_state:
+                    st.warning("Primero debe seleccionar una jornada")
+                else:
+                    # Recopilamos la información del partido actual usando las variables
+                    # que ya están disponibles en la función main()
+                    figures = {}
+                
+                    # Preparamos un objeto para guardar las figuras generadas
+                    if 'pdf_figures' not in st.session_state:
+                        st.session_state.pdf_figures = {}
+                
+                    # Iniciar la creación del PDF con los datos del partido seleccionado
+                    jornada_actual = st.session_state.selected_jornada
+                
+                    # Recrear información clave del partido (estas variables están en main())
+                    selected_jornada = jornada_actual
+                    partido_row = partidos_df[partidos_df['formato_jornada'] == selected_jornada]
+                
+                    if not partido_row.empty:
+                        partido_data = partido_row.iloc[0]
+                        jornada_num = partido_data['Jornada']
+                        equipo_local = partido_data['equipo_local']
+                        equipo_visitante = partido_data['equipo_visitante']
+                    
+                        # 1. Intentar obtener figura de Match Momentum
+                        try:
+                            if 'id_fotmob' in partido_data and not pd.isna(partido_data['id_fotmob']):
+                                fotmob_id = str(partido_data['id_fotmob'])
+                                fig_mm, _ = fotmob_match_momentum_plot_atletico(fotmob_id, debug=False)
+                                figures["Dinámica del partido"] = fig_mm
+                        except Exception as e:
+                            st.warning(f"No se pudo incluir la figura de momentum: {str(e)}")
+                    
+                        # 2. Intentar obtener figura de Red de Pases
+                        try:
+                            jornada_formato = selected_jornada.replace(' ', '_')
+                            events_file = f"data/FData/matches/{jornada_formato}_EventData_whoscored.csv"
+                            players_file = f"data/FData/matches/{jornada_formato}_PlayerData_whoscored.csv"
+                            teams_file = "data/FData/master/equipos_master.csv"
+                        
+                            df_red, dfp_red, team_info = process_whoscored_event_data(events_file, players_file, teams_file)
+                            passes_df = get_passes_df(df_red)
+                        
+                            # Colores para los equipos
+                            atleti_color = '#172790'
+                            rival_color = '#e60000'
+                        
+                            # Crear figura para PDF
+                            passes_fig, axs = plt.subplots(1, 2, figsize=(20, 12), facecolor="#d4d4d4")
+                        
+                            for i, team_name in enumerate([team_info['home_team_name'], team_info['away_team_name']]):
+                                is_this_team_atleti = (team_info['is_atleti_home'] and i == 0) or (not team_info['is_atleti_home'] and i == 1)
+                                team_color = atleti_color if is_this_team_atleti else rival_color
+                            
+                                passes_between_df, average_locs_df = get_passes_between_df(team_name, passes_df, None, df_red)
+                            
+                                pass_network_visualization(
+                                    ax=axs[i],
+                                    passes_between_df=passes_between_df,
+                                    average_locs_and_count_df=average_locs_df,
+                                    teamName=team_name,
+                                    passes_df=passes_df,
+                                    home_team=team_info['home_team_name'],
+                                    away_team=team_info['away_team_name'],
+                                    team_color=team_color,
+                                    jornada=selected_jornada
+                                )
+                        
+                            plt.tight_layout()
+                            figures["Redes de pases"] = passes_fig
+                        except Exception as e:
+                            st.warning(f"No se pudo incluir la figura de red de pases: {str(e)}")
+                    
+                        # 3. Intentar obtener figura de xG
+                        try:
+                            url_partido = partido_data.get('url_fbref')
+                        
+                            if url_partido:
+                                df_processed = pd.read_html(url_partido, attrs={'id': 'shots_all'})[0]
+                            
+                                if not df_processed.empty and df_processed.shape[0] >= 2:
+                                    df_xG = preprocess_xg_data(df_processed)
+                                
+                                    if not df_xG.empty:
+                                        xg_fig = plot_xg_timeline(df_xG)
+                                        figures["Expected Goals (xG)"] = xg_fig
+                        except Exception as e:
+                            st.warning(f"No se pudo incluir la figura de xG: {str(e)}")
+                    
+                        # 4. Intentar obtener mapa de tiros
+                        try:
+                            if 'id_understat' in partido_data and not pd.isna(partido_data['id_understat']):
+                                understat_id = str(int(float(partido_data['id_understat'])))
+                            
+                                # Importar la función directamente
+                                from data.data_processing.understat_data import get_shot_map
+                                shots_data = get_shot_map(understat_id)
+                            
+                                if shots_data:
+                                    local_fig = plot_shot_map(shots_data['local'], partido_data['equipo_local'])
+                                    visitante_fig = plot_shot_map(shots_data['visitante'], partido_data['equipo_visitante'])
+                                
+                                    figures["Mapa de tiros Local"] = local_fig
+                                    figures["Mapa de tiros Visitante"] = visitante_fig
+                        except Exception as e:
+                            st.warning(f"No se pudo incluir los mapas de tiros: {str(e)}")
+                    
+                        # 5. Datos para el PDF
+                        # Obtener estadísticas del partido
+                        partido_str = f"{equipo_local}-{equipo_visitante}"
+                        match_stats_pdf = load_match_stats(jornada=jornada_num, partido=partido_str)
+                    
+                        # Crear diccionario con datos para PDF
+                        pdf_data = {
+                            "Información del Partido": f"{equipo_local} vs {equipo_visitante} - Jornada {jornada_num}"
+                        }
+                    
+                        # Añadir estadísticas si existen
+                        if match_stats_pdf is not None and not match_stats_pdf.empty:
+                            pdf_data["Estadísticas"] = "Métricas clave del encuentro"
+                            pdf_data["Tabla de Estadísticas"] = match_stats_pdf
+                    
+                        # Añadir descripciones para las figuras
+                        if "Dinámica del partido" in figures:
+                            pdf_data["Dinámica del partido"] = "Análisis del momentum del partido mostrando los momentos clave"
+                    
+                        if "Redes de pases" in figures:
+                            pdf_data["Redes de pases"] = "Visualización de las conexiones entre jugadores durante el partido"
+                    
+                        if "Expected Goals (xG)" in figures:
+                            pdf_data["Expected Goals (xG)"] = "Análisis de las oportunidades de gol generadas por cada equipo"
+                    
+                        if "Mapa de tiros Local" in figures:
+                            pdf_data["Mapa de tiros Local"] = f"Distribución y calidad de los tiros de {equipo_local}"
+                    
+                        if "Mapa de tiros Visitante" in figures:
+                            pdf_data["Mapa de tiros Visitante"] = f"Distribución y calidad de los tiros de {equipo_visitante}"
+                    
+                        # 6. Generar PDF
+                        filename = f"Analisis_{equipo_local}_vs_{equipo_visitante}_J{jornada_num}_{datetime.now().strftime('%d%m%Y')}.pdf"
+                        pdf_bytes = export_to_pdf(
+                            pdf_data,
+                            figures=figures,
+                            filename=filename,
+                            title=f"Análisis Atlético de Madrid - Jornada {jornada_num}"
+                        )
+                    
+                        # Guardar en session_state para el botón de descarga
+                        st.session_state.pdf_bytes = pdf_bytes
+                        st.session_state.pdf_filename = filename
+                        st.success("PDF generado correctamente")
+                    else:
+                        st.error(f"No se encontró información para la jornada: {jornada_actual}")
             
-            # Mostrar botón de descarga - MOVIDO DENTRO DEL BLOQUE IF
-            st.session_state.pdf_bytes = pdf_bytes
-            st.session_state.pdf_filename = f"informe_atm_{datetime.now().strftime('%d%m%Y')}.pdf"
-            st.success("PDF generado correctamente")
-
+            except Exception as e:
+                st.error(f"Error al generar el PDF: {str(e)}")
+                import traceback
+                st.error(traceback.format_exc())
+    
         # Si hay un PDF generado, mostrar el botón de descarga
         if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
             download_pdf_button(
                 st.session_state.pdf_bytes,
-                filename=st.session_state.pdf_filename
-            )
+                filename=st.session_state.pdf_filename)
     
     # Columna central - Espacio vacío
     with footer_cols[1]:

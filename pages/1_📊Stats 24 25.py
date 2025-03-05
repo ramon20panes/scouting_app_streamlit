@@ -18,10 +18,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# Cargar estilos al principio del archivo
+# Cargar estilos
 load_all_styles()
 
-# Mostrar la sidebar explícitamente en las páginas interiores
+# Sidebar explícitamente en las páginas interiores
 st.markdown("""
     <style>
     [data-testid="stSidebar"][aria-expanded="false"],
@@ -38,7 +38,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Añadir reducción de márgenes y espaciados
+# Reducción de márgenes y espaciados
 st.markdown("""
 <style>
 .block-container {
@@ -69,8 +69,8 @@ with col_title:
     """, unsafe_allow_html=True)
 
 with col_logo:
-    st.write("")  # Esto añade un pequeño espacio vertical
-    st.image(ESCUDO_PATH, width=70)  # Reducir el tamaño del escudo
+    st.write("")  
+    st.image(ESCUDO_PATH, width=70)  
 
 # Reducir el espacio antes de los tabs
 st.markdown("""
@@ -87,6 +87,9 @@ div[data-testid="stTabContent"] {
 </style>
 """, unsafe_allow_html=True)
 
+# ----------------------------------------------------------------
+# Sección 1, tabla métricas
+
 # Cargar datos de jugadores del Atlético
 @st.cache_data(ttl=3600)
 def load_data():
@@ -97,20 +100,17 @@ player_data = load_data()
 if player_data.empty:
     st.error("No se pudieron cargar los datos de los jugadores. Verifique la conexión a la base de datos.")
 else:
-    # Categorizar métricas
     categorized_metrics = categorize_metrics(player_data.columns)
     
     filter_col1, filter_col2 = st.columns([4, 1])
     
     with filter_col1:
-        # Inicializar valores por defecto si es la primera vez
+        
         if "selected_metrics" not in st.session_state:
             st.session_state.selected_metrics = ["Ataque"]
-        # Asegurarse de que "Ataque" siempre esté incluido
         elif "Ataque" not in st.session_state.selected_metrics:
             st.session_state.selected_metrics = ["Ataque"] + st.session_state.selected_metrics
 
-        # Selector de categorías para la tabla con estado persistente
         metric_categories = st.multiselect(
             "Grupo métricas:",
             ["Ataque", "Pases", "Posesión", "Defensa", "Disciplina"],
@@ -118,12 +118,11 @@ else:
         )   
 
         # Guardar la selección actual en session_state
-        # Si el usuario quitó todas las selecciones, volver a poner "Ataque"
+        # Si el usuario quita todas las selecciones, volver a poner "Ataque"
         if not metric_categories:
             metric_categories = ["Ataque"]
         st.session_state.selected_metrics = metric_categories
-    
-        # Recopilar métricas de las categorías seleccionadas
+
         selected_table_metrics = []
         for category in metric_categories:
             selected_table_metrics.extend(categorized_metrics.get(category, []))
@@ -157,7 +156,7 @@ else:
         use_container_width=True,
         height=300
     )
-    
+    # ---------------------------------         
     # SECCIÓN 2: Rankings con slider de minutos
     st.markdown("""
         <h2 style='text-align: left; margin-top: -10px;'>
@@ -165,18 +164,15 @@ else:
         </h2>
     """, unsafe_allow_html=True)
 
-    
-    # Fila para controles de ranking
     rank_control_cols = st.columns([3, 1])
     
     with rank_control_cols[0]:
-        # Todas las métricas para rankings (excluyendo las básicas)
+
         all_metrics = []
         for category, metrics in categorized_metrics.items():
             if category != "Básicas":
                 all_metrics.extend(metrics)
         
-        # Tres selectores para métricas de ranking
         rank_metric_cols = st.columns(3)
         with rank_metric_cols[0]:
             ranking_metric1 = st.selectbox(" ",all_metrics, 
@@ -201,31 +197,31 @@ else:
     rank_players = player_data[(player_data['Minutos'] >= rank_min) & 
                                (player_data['Minutos'] <= rank_max)]
     
-    # Mostrar rankings en tres columnas
+    # Tres columnas
     ranking_cols = st.columns(3)
     
     with ranking_cols[0]:
-        # Top jugadores para métrica 1
+        # Métrica 1
         top_players1 = rank_players.sort_values(by=ranking_metric1, ascending=False).head(5)
         st.markdown(f"<h5 style='text-align: center;'>Top {ranking_metric1}</h5>", unsafe_allow_html=True)
         for i, (_, player) in enumerate(top_players1.iterrows(), 1):
             st.markdown(f"{i}. {player['Jugador']} - {player[ranking_metric1]}")
     
     with ranking_cols[1]:
-        # Top jugadores para métrica 2
+        # Métrica 2
         top_players2 = rank_players.sort_values(by=ranking_metric2, ascending=False).head(5)
         st.markdown(f"<h5 style='text-align: center;'>Top {ranking_metric2}</h5>", unsafe_allow_html=True)
         for i, (_, player) in enumerate(top_players2.iterrows(), 1):
             st.markdown(f"{i}. {player['Jugador']} - {player[ranking_metric2]}")
     
     with ranking_cols[2]:
-        # Top jugadores para métrica 3
+        # Métrica 3
         top_players3 = rank_players.sort_values(by=ranking_metric3, ascending=False).head(5)
         st.markdown(f"<h5 style='text-align: center;'>Top {ranking_metric3}</h5>", unsafe_allow_html=True)
         for i, (_, player) in enumerate(top_players3.iterrows(), 1):
             st.markdown(f"{i}. {player['Jugador']} - {player[ranking_metric3]}")        
     
-# Obtener el nombre de la página actual
+# Nombre de la página actual
 current_page = __file__.split('\\')[-1]
 
 # Inicializar y actualizar el historial
@@ -236,6 +232,7 @@ if "page_history" not in st.session_state:
 if not st.session_state.page_history or st.session_state.page_history[-1] != current_page:
     st.session_state.page_history.append(current_page)
 
+# ----------------------------------------------------------------
 # Crear contenedor para botón de PDF y footer sin línea divisoria
 st.markdown("---")
 footer_container = st.container()
@@ -249,31 +246,29 @@ with footer_container:
         if st.button("📑 Exportar Informe PDF", key="generate_pdf"):
             # Crear diccionario con datos para el PDF
             pdf_data = {
-                "Información General": "Informe de métricas del Atlético de Madrid temporada 24/25",
                 f"Tabla de Jugadores ({', '.join(metric_categories)})": filtered_players[display_columns],
                 f"Ranking de {ranking_metric1}": top_players1[['Jugador', ranking_metric1]],
                 f"Ranking de {ranking_metric2}": top_players2[['Jugador', ranking_metric2]],
                 f"Ranking de {ranking_metric3}": top_players3[['Jugador', ranking_metric3]]
             }
-            
-            # Generar PDF
+    
+            # Generar PDF 
             pdf_bytes = export_to_pdf(
                 pdf_data, 
-                filename=f"informe_atm_{datetime.now().strftime('%d%m%Y')}.pdf",
+                filename=f"Métricas ATM 24/25 {datetime.now().strftime('%d%m%Y')}.pdf",
                 title="Informe Atlético de Madrid - Métricas 24/25"
             )
-            
-            # Mostrar botón de descarga
+    
+            # Código para mostrar el botón
             st.session_state.pdf_bytes = pdf_bytes
-            st.session_state.pdf_filename = f"informe_atm_{datetime.now().strftime('%d%m%Y')}.pdf"
+            st.session_state.pdf_filename = f"Métricas ATM 24/25 {datetime.now().strftime('%d%m%Y')}.pdf"
             st.success("PDF generado correctamente")
-        
-        # Si hay un PDF generado, mostrar el botón de descarga
-        if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
-            download_pdf_button(
-                st.session_state.pdf_bytes,
-                filename=st.session_state.pdf_filename
-            )
+
+            # Si hay un PDF generado, mostrar el botón de descarga
+            if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
+                    download_pdf_button(
+                        st.session_state.pdf_bytes,
+                        filename=st.session_state.pdf_filename)
     
     # Columna central - Espacio vacío
     with footer_cols[1]:
@@ -305,7 +300,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ----------------------------------------------------------------
 # Sidebar con navegación al final
+
 with st.sidebar:
     # Espacio flexible
     st.markdown('<div style="flex-grow: 1;"></div>', unsafe_allow_html=True)
@@ -316,10 +313,8 @@ with st.sidebar:
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Back"):
-                if len(st.session_state.page_history) > 1:
-                    # Quitar página actual
+                if len(st.session_state.page_history) > 1:                    
                     st.session_state.page_history.pop()
-                    # Ir a página anterior
                     previous_page = st.session_state.page_history[-1]
                     st.switch_page(f"pages/{previous_page}")
         with col2:

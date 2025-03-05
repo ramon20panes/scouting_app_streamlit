@@ -249,7 +249,7 @@ def fotmob_match_momentum_plot_atletico(match_id, save_fig=False, debug=False):
             raise Exception(f"El partido {match_id} no tiene datos de momentum: {str(e)}")
     
         # Crear figura base
-        fig, ax = plt.subplots(figsize=(16, 9), facecolor='#d4d4d4')
+        fig, ax = plt.subplots(figsize=(12, 5), facecolor='#d4d4d4')
         ax.set_facecolor('#d4d4d4')
     
         # ASIGNACIÓN DE COLORES CORREGIDA:
@@ -282,8 +282,8 @@ def fotmob_match_momentum_plot_atletico(match_id, save_fig=False, debug=False):
         away_color = ATLETICO_COLOR if atletico_is_away else RIVAL_COLOR
     
         # Título
-        plt.figtext(0.35, 0.87, home_team, color=home_color, fontsize=20, weight='bold', ha='right')
-        plt.figtext(0.65, 0.87, away_team, color=away_color, fontsize=20, weight='bold', ha='left')
+        plt.figtext(0.35, 0.87, home_team, color=home_color, fontsize=18, weight='bold', ha='right')
+        plt.figtext(0.65, 0.87, away_team, color=away_color, fontsize=18, weight='bold', ha='left')
         
         # if save_fig:
         #    plt.savefig(f'{match_id}_match_momentum.png', bbox_inches='tight')
@@ -448,7 +448,7 @@ def plot_xg_timeline(df_xG):
     """
     # Configurar el estilo del fondo
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(8, 4))
     fig.patch.set_facecolor('lightgrey')
     ax.set_facecolor('lightgrey')
 
@@ -525,7 +525,8 @@ def plot_xg_timeline(df_xG):
                 half_df['cumulative_xG'], 
                 label=team, 
                 drawstyle='steps-post',
-                c=team_color
+                c=team_color,
+                linewidth=1.5
             )   
             
     # Añadimos un scatter para los goles
@@ -539,7 +540,7 @@ def plot_xg_timeline(df_xG):
                 x['cumulative_xG'], 
                 c='white',
                 edgecolor=team_color,
-                s=100,
+                s=80,
                 # Posicionamos en el tope de las líneas
                 zorder=5
             )
@@ -553,7 +554,7 @@ def plot_xg_timeline(df_xG):
                 va='center',
                 weight='bold',
                 color='black', 
-                fontsize=8,
+                fontsize=7,
                 zorder=10
             )
             
@@ -561,19 +562,22 @@ def plot_xg_timeline(df_xG):
     ax.set_xticks([0, 45, 90])
     ax.set_xticklabels(['0\'', '45\'', '90\''], color='#000000')
     # Agregamos Primera y Segunda parte
-    ax.text(22.5, -.25, 'Primer tiempo', ha='center',  fontsize=12, weight='bold', color='#000000')
-    ax.text(67.5, -.25, 'Segundo tiempo', ha='center',  fontsize=12, weight='bold', color='#000000')
+    ax.text(22.5, -.25, 'Primer tiempo', ha='center',  fontsize=10, weight='bold', color='#000000')
+    ax.text(67.5, -.25, 'Segundo tiempo', ha='center',  fontsize=10, weight='bold', color='#000000')
     # Etiquetamos el acumulado
-    ax.set_ylabel('xG Acumulado',  fontsize=12, weight='bold', color='#000000')
+    ax.set_ylabel('xG Acumulado',  fontsize=10, weight='bold', color='#000000')
+    
     # Quitamos las barras de arriba y de derecha
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     # Cambiamos el color de las spines (ejes izquierdo e inferior)
     ax.spines['left'].set_color('#000000')
+    ax.spines['left'].set_linewidth(0.8)  
     ax.spines['bottom'].set_color('#000000')
+    ax.spines['bottom'].set_linewidth(0.8)
     # Cambiamos el color de los números en los ejes X e Y
-    ax.tick_params(axis='x', colors='#000000')  # Color de los números del eje X
-    ax.tick_params(axis='y', colors='#000000')  # Color de los números del eje Y
+    ax.tick_params(axis='x', colors='#000000', labelsize=8)  # Color de los números del eje X
+    ax.tick_params(axis='y', colors='#000000', labelsize=8)  # Color de los números del eje Y
 
     # Cambiamos el color de los textos en el título
     # Nota: Coloreamos los equipos por su identidad, no por local/visitante
@@ -584,7 +588,7 @@ def plot_xg_timeline(df_xG):
         0.5,
         0.95,
         f'<{equipo_local}> vs <{equipo_visitante}>', 
-        fontsize=16, 
+        fontsize=14, 
         ha='center', 
         va='center', 
         ax=ax,      
@@ -671,7 +675,7 @@ def plot_shot_map(shots_df, team_name, team_color=None):
         matplotlib.figure.Figure: Figura con el mapa de tiros
     """
     if shots_df is None or shots_df.empty:
-        fig, ax = plt.subplots(figsize=(10, 7))
+        fig, ax = plt.subplots(figsize=(4, 2))
         ax.text(0.5, 0.5, "No hay datos de tiros disponibles", ha='center', va='center', fontsize=14)
         ax.axis('off')
         return fig
@@ -684,7 +688,7 @@ def plot_shot_map(shots_df, team_name, team_color=None):
         team_color = '#172790' if is_atleti else '#e60000'  # Azul para Atleti, rojo para rival
     
     # Crear figura
-    fig, ax = plt.subplots(figsize=(10, 7), facecolor='#F0F0F0')
+    fig, ax = plt.subplots(figsize=(6, 4), facecolor='#F0F0F0')
     
     # Configurar campo
     pitch = Pitch(pitch_type='opta', pitch_length=100, pitch_width=100,
@@ -696,7 +700,7 @@ def plot_shot_map(shots_df, team_name, team_color=None):
     # Dibujar tiros
     for _, shot in shots_df.iterrows():
         is_goal = shot['result'] == 'Goal'
-        size = shot['xG'] * 1500  # Tamaño basado en xG
+        size = shot['xG'] * 1000  # Tamaño basado en xG
         
         ax.scatter(
             shot['x'],
@@ -705,30 +709,30 @@ def plot_shot_map(shots_df, team_name, team_color=None):
             s=size,
             alpha=0.7,
             edgecolors='black',
-            linewidth=2 if is_goal else 1,
+            linewidth=1 if is_goal else 0.5,
             marker='*' if is_goal else 'o'
         )
     
     # Título y estadísticas
-    ax.set_title(f"{team_name}", color='#333333', fontsize=16, weight='bold')
+    ax.set_title(f"{team_name}", color='#333333', fontsize=10, weight='bold')
     
     # Leyenda
     legend_elements = [
         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=team_color, 
-                  markersize=10, label='Tiro'),
+                  markersize=6, label='Tiro'),
         plt.Line2D([0], [0], marker='*', color='w', markerfacecolor=team_color, 
-                  markersize=15, label='Gol')
+                  markersize=9, label='Gol')
     ]
-    ax.legend(handles=legend_elements, loc='upper center', frameon=True)
+    ax.legend(handles=legend_elements, loc='upper center', frameon=True, fontsize=8)
     
     # Estadísticas
     stats_text = (f"Tiros: {len(shots_df)} | "
                  f"Goles: {len(shots_df[shots_df['result'] == 'Goal'])} | "
                  f"xG Total: {shots_df['xG'].sum():.2f}")
     
-    plt.figtext(0.5, 0.02, stats_text, ha='center', color='#333333', weight='bold')
+    plt.figtext(0.5, 0.02, stats_text, ha='center', color='#333333', weight='bold', fontsize=8)
     
-    plt.tight_layout()
+    plt.tight_layout(pad=0.5)
     return fig
 
 def draw_pitch(ax, half=False):

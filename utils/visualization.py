@@ -86,7 +86,7 @@ def create_bumpy_chart(df, highlight_teams=None):
         scatter_color='#A0A0A0', 
         line_color='#A0A0A0',
         rotate_xticks=90,
-        ticklabel_size=12,
+        ticklabel_size=8,
         scatter_primary='D',
         show_right=True,
         plot_labels=True,
@@ -101,15 +101,15 @@ def create_bumpy_chart(df, highlight_teams=None):
         values=df_plot,
         secondary_alpha=0.3,
         highlight_dict=highlight_dict,
-        figsize=(12, 6),  
+        figsize=(8, 4),  
         y_label='Posición',
         x_label='Jornadas',
         ylim=(20.5, 0.5),
         lw=2
     )
     # Cambiar el color de la etiqueta 'Posición' a darkblue
-    ax.set_ylabel('Posición', color='darkblue', fontweight='bold')
-    ax.set_xlabel('Jornadas', color='darkblue', fontweight='bold')
+    ax.set_ylabel('Posición', color='darkblue', fontweight='bold', size=12)
+    ax.set_xlabel('Jornadas', color='darkblue', fontweight='bold', size=12)
 
     # Configurar etiquetas de eje X (jornadas)
     ax.set_xticks(range(len(Jornada_labels)))
@@ -123,13 +123,13 @@ def create_bumpy_chart(df, highlight_teams=None):
     ax.set_facecolor('#d4d4d4')
     fig.patch.set_facecolor('#d4d4d4')
     
-    # Actualizar título a negro
+    # Actualizar título
     fig.text(
         s='Progresión Clasificación LaLiga 24/25',
         x=.5, 
         y=.95,
         c='darkblue',  
-        size=18,
+        size=14,
         weight='bold',
         ha='center'
     )
@@ -149,7 +149,7 @@ def create_bumpy_chart(df, highlight_teams=None):
         y=.93,
         s=highlight_text_str,
         highlight_textprops=highlight_textprops,
-        fontsize=14,
+        fontsize=12,
         color='black',  
         ha='center'
     )
@@ -454,14 +454,14 @@ def plot_atletico_xg_differential(df_expcGL, df1):
     
     # Configurar gráfico
     plt.style.use('fivethirtyeight')
-    fig, ax = plt.subplots(figsize=(5, 3))
+    fig, ax = plt.subplots(figsize=(4, 2))
     
     # Cambiar fondo
     fig.patch.set_facecolor('#d4d4d4')
     ax.set_facecolor('#d4d4d4')
 
     # Eliminar el borde del gráfico
-    ax.spines['top'].set_visible(True)
+    ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
@@ -469,15 +469,15 @@ def plot_atletico_xg_differential(df_expcGL, df1):
     # Dibujar barras
     bar_height = 0.5
     plt.hlines(y=df_expcGL_pos['y_pos'], xmin=0, xmax=df_expcGL_pos['xGdif'], 
-               color='green', alpha=0.7, linewidth=bar_height*10)
+               color='green', alpha=0.7, linewidth=bar_height*8)
     plt.hlines(y=df_expcGL_neg['y_pos'], xmin=0, xmax=df_expcGL_neg['xGdif'], 
-               color='red', alpha=0.7, linewidth=bar_height*10)
+               color='red', alpha=0.7, linewidth=bar_height*8)
     
     # Configuración de ejes
     ax.tick_params(axis='x', colors='darkblue')
     ax.tick_params(axis='y', colors='darkblue')
-    plt.xticks([-3, -2, -1, 0, 1, 2, 3, 4, 5], fontsize=5, weight='bold')
-    plt.yticks(y_positions, jornada_labels_inverted, rotation='horizontal', fontsize=5, color='darkblue', weight='bold')
+    plt.xticks([-3, -2, -1, 0, 1, 2, 3, 4, 5], fontsize=4, weight='bold')
+    plt.yticks(y_positions, jornada_labels_inverted, rotation='horizontal', fontsize=4, color='darkblue', weight='bold')
     
     # Ajustes visuales
     ax.tick_params(axis='y', pad=1, which='both', left=True)
@@ -488,21 +488,21 @@ def plot_atletico_xg_differential(df_expcGL, df1):
     for i, row in df_expcGL_pos.iterrows():
         plt.annotate(f"{row['xGdif']:.1f}", 
                      (row['xGdif'] + 0.2, row['y_pos']),
-                     c='green', size=6, ha='center', va='center', weight='bold')
+                     c='green', size=5, ha='center', va='center', weight='bold')
     
     for i, row in df_expcGL_neg.iterrows():
         plt.annotate(f"{row['xGdif']:.1f}", 
                      (row['xGdif'] - 0.2, row['y_pos']),
-                     c='red', size=6, ha='center', va='center', weight='bold')
+                     c='red', size=5, ha='center', va='center', weight='bold')
     
     # Títulos
-    fig_text(0.18, 1.01, s="Diferencial xG, Atleti 24-25", fontsize=10, weight='bold', color="darkblue")
-    fig_text(0.218, 0.95, s=" <Negativo xG>     <Positivo xG>", 
+    fig_text(0.18, 1.01, s="Diferencial xG, Atleti 24-25", fontsize=8, weight='bold', color="darkblue")
+    fig_text(0.18, 0.95, s=" <Negativo xG>     <Positivo xG>", 
              highlight_textprops=[{"color":'red'}, {'color':"green"}], 
              fontsize=8, fontweight="bold")
     
     # Etiqueta eje X
-    fig_text(0.33, 0.005, s="Diferencial xG", fontsize=6, fontweight="bold", color="darkblue")
+    fig_text(0.33, 0.005, s="Diferencial xG", fontsize=5, fontweight="bold", color="darkblue")
     
     # Ajustar márgenes
     plt.subplots_adjust(left=0.1, right=0.92, top=0.90, bottom=0.05)

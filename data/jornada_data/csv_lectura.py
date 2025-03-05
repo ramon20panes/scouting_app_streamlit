@@ -114,8 +114,8 @@ def get_partido_info(match_id):
     Returns:
         dict: Información del partido (jornada, partido, etc.)
     """
-    # Esta función debería obtener la información desde tu archivo partidos_master.csv
-    # Por ahora, es un placeholder que deberás implementar
+    # Esta función obtiene la información desde tu archivo partidos_master.csv
+    
     try:        
         
         partidos_df = load_partidos_master()

@@ -13,7 +13,7 @@ def load_teams_mapping():
         dict: Diccionario con el mapeo de nombres y rutas a escudos
     """
     try:
-        # Ajusta la ruta según donde esté tu CSV
+        # Ajusta la ruta 
         csv_path = Path("data/FData/master/equipos_master.csv")
         
         # Intentar diferentes delimitadores
@@ -21,7 +21,7 @@ def load_teams_mapping():
         
         for delimiter in delimiters:
             try:
-                # Leer el CSV con el delimitador actual
+                # Lee CSV con delimitador actual
                 df_tm = pd.read_csv(csv_path, sep=';', dtype=str)
                                 
                 # Mapeo manual para manejar variaciones de nombres
@@ -42,7 +42,7 @@ def load_teams_mapping():
                 for _, row in df_tm.iterrows():
                     # Usar la primera columna como nombre del equipo
                     nombre_csv = row.iloc[0]
-                    shortname = row.iloc[1].lower()  # Asumiendo que la segunda columna es el shortname
+                    shortname = row.iloc[1].lower()  # Segunda columna shortname
                     logo_path = row.iloc[-1].strip("'")  # Última columna como ruta del logo
                     
                     # Buscar nombre de mapeo manual o usar nombre original
@@ -92,7 +92,7 @@ def find_closest_team_name(api_name, team_mapping):
         'real sociedad': 'Real Sociedad de Fútbol',
         'real madrid': 'Real Madrid CF',
         'valladolid': 'Real Valladolid CF',
-        # Añade más casos según necesites
+        # Añadir más casos si es necesario
     }
     
     # Comprobar casos especiales
@@ -162,7 +162,7 @@ def process_matches(matches, team_mapping=None):
     Returns:
         pd.DataFrame: DataFrame con los datos procesados
     """
-    # Cargar el mapeo de equipos si no se proporcionó
+    # Cargar el mapeo de equipos si no se ha proporcionado
     if team_mapping is None:
         team_mapping = load_teams_mapping()
     
