@@ -84,6 +84,8 @@ Posibles dos nuevas páginas en un futuro.
 2. Crear entorno virtual: `python -m venv venv`
 3. Instalar dependencias: `pip install -r requirements.txt`
 4. Ejecutar: `streamlit run Aplic_Direcc_Deport.py`
+5. Back, exit con página totalmente cargada
+6. Exportar solo cuando se ha generado el informe dentro de esa página
 
 ## Problemas y retos
 
