@@ -4,6 +4,15 @@ def load_all_styles():
     
     st.markdown("""
         <style>
+        /* Variables CSS para mantener consistencia */
+        :root {
+            --primary-color: #001F3F;
+            --primary-font: 'Roboto Slab', serif;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+        }
+        
         /* Control inmediato de sidebar y navegación - Poner al inicio */
         [data-testid="stSidebar"][aria-expanded="false"],
         [data-testid="stSidebar"][aria-expanded="true"],
@@ -27,7 +36,7 @@ def load_all_styles():
         
         /* Aplicar fuente a toda la aplicación */
         * {
-            font-family: 'Roboto Slab', serif !important;
+            font-family: var(--primary-font) !important;
         }
         
         /* Estilos principales */
@@ -35,13 +44,13 @@ def load_all_styles():
             text-align: left;
             font-size: 2.5em;
             margin-bottom: 0;
-            color: #001F3F;
+            color: var(--primary-color);
             font-weight: bold;
         }
         .subtitle {
             text-align: left;
             font-size: 1.8em;
-            color: #001F3F;
+            color: var(--primary-color);
             margin-top: 0;
             font-weight: bold;
         }
@@ -52,7 +61,7 @@ def load_all_styles():
             right: 20px;
             bottom: 60px;
             text-align: right;
-            color: #001F3F;
+            color: var(--primary-color);
             font-weight: bold;
             z-index: 1000;
         }
@@ -96,77 +105,113 @@ def load_all_styles():
         
         /* Estilos globales */
         .stTextInput input, .stTextInput label {
-            color: #001F3F !important;
+            color: var(--primary-color) !important;
             font-size: 0.9em !important;
             max-width: 200px !important;
         }
         
         /* Color global de texto */
         .st-emotion-cache-*, div, p, h1, h2, h3, label {
-            color: #001F3F !important;
-        }        
-        /* Ajustes responsivos mejorados */
-        @media (max-width: 1200px) {
-            .main-title { font-size: 2.2em; }
-            .subtitle { font-size: 1.6em; }
+            color: var(--primary-color) !important;
         }
-        @media (max-width: 768px) {
-            .main-title { font-size: 1.8em; }
-            .subtitle { font-size: 1.4em; }
-            div[data-testid="stImage"] img { max-width: 150px !important; }
+        
+        /* Contenedores flexibles responsivos */
+        .responsive-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-md);
         }
-        @media (max-width: 480px) {
-            .main-title { font-size: 1.5em; }
-            .subtitle { font-size: 1.2em; }
-            div[data-testid="stImage"] img { max-width: 100px !important; }
-        }
+        
         /* Reducir espaciado general en toda la aplicación */
-                .block-container {
-                padding-top: 0.5rem !important;
-                padding-bottom: 0rem !important;
-                margin-top: -15px !important;
+        .block-container {
+            padding-top: var(--spacing-sm) !important;
+            padding-bottom: 0 !important;
+            margin-top: -15px !important;
         }
     
         /* Reducir espacios entre elementos */
-            div[data-testid="stVerticalBlock"] > div {
+        div[data-testid="stVerticalBlock"] > div {
             margin-bottom: 0.2rem !important;
         }
     
         /* Reducir tamaño de títulos */
-                h1 {
-                font-size: 1.8rem !important;
-                margin-bottom: 0.2rem !important;
-                }
+        h1 {
+            font-size: 1.8rem !important;
+            margin-bottom: 0.2rem !important;
+        }
     
-                h2 {
-                font-size: 1.5rem !important;
-                margin-bottom: 0.2rem !important;
-                }
+        h2 {
+            font-size: 1.5rem !important;
+            margin-bottom: 0.2rem !important;
+        }
     
-                h3, h4, h5 {
-                font-size: 1.2rem !important;
-                margin-bottom: 0.1rem !important;
-                }
+        h3, h4, h5 {
+            font-size: 1.2rem !important;
+            margin-bottom: 0.1rem !important;
+        }
     
-                /* Reducir espacio en elementos de formulario */
-                div[data-testid="stFormSubmitButton"] {
-                margin-top: 0.5rem !important;
-                }
+        /* Reducir espacio en elementos de formulario */
+        div[data-testid="stFormSubmitButton"] {
+            margin-top: var(--spacing-sm) !important;
+        }
     
         /* Compactar selectores múltiples */
-                div[data-testid="stMultiSelect"] {
-                margin-bottom: 0.3rem !important;
-                }
+        div[data-testid="stMultiSelect"] {
+            margin-bottom: 0.3rem !important;
+        }
                 
         /* Ajustar espacio del encabezado */
-                div.stHorizontalBlock:first-child {
-                margin-top: 15px !important;
-                padding-top: 10px !important;
-                }
+        div.stHorizontalBlock:first-child {
+            margin-top: 15px !important;
+            padding-top: 10px !important;
+        }
     
         /* Ajustar espacio para el logo */
-                div.stHorizontalBlock:first-child div.column:nth-child(2) {
-                padding-top: 10px !important;
-                }
+        div.stHorizontalBlock:first-child div.column:nth-child(2) {
+            padding-top: 10px !important;
+        }
+        
+        /* Ajustes responsivos mejorados */
+        @media (max-width: 1200px) {
+            .main-title { font-size: 2.2em; }
+            .subtitle { font-size: 1.6em; }
+            .responsive-container > div {
+                flex: 1 1 48%;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-title { font-size: 1.8em; }
+            .subtitle { font-size: 1.4em; }
+            div[data-testid="stImage"] img { max-width: 150px !important; }
+            .responsive-container > div {
+                flex: 1 1 100%;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .main-title { font-size: 1.5em; }
+            .subtitle { font-size: 1.2em; }
+            div[data-testid="stImage"] img { max-width: 100px !important; }
+            
+            /* Ajustes para footer en móvil */
+            .footer-container {
+                position: relative;
+                margin-top: 2rem;
+                right: auto;
+                bottom: auto;
+            }
+            .footer img {
+                max-width: 150px;
+            }
+            
+            /* Ajustes para autor en móvil */
+            .author-container {
+                position: relative;
+                margin-top: 1rem;
+                right: auto;
+                bottom: auto;
+            }
+        }
     </style>
 """, unsafe_allow_html=True)
