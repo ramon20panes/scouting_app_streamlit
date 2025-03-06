@@ -49,8 +49,20 @@ def get_players_atleti():
     Returns:
         DataFrame: Datos de los jugadores del Atlético de Madrid
     """
+    # Imprimir todas las rutas posibles
+    possible_paths = [
+        Path(__file__).parent.parent / "FData/stats/stats_big5_24_25.db",
+        Path("data/FData/stats/stats_big5_24_25.db"),
+        Path("/mount/src/scouting_app_streamlit/data/FData/stats/stats_big5_24_25.db")
+    ]
+
+    for path in possible_paths:
+        print(f"Comprobando ruta: {path}")
+        print(f"Existe: {path.exists()}")
+    
     conn = get_connection()
     if not conn:
+        print("No se pudo establecer conexión con la base de datos")
         return pd.DataFrame()
     
     query = """
@@ -115,10 +127,13 @@ def get_players_atleti():
     """
     
     try:
+        print("Ejecutando consulta...")
         player_data = pd.read_sql(query, conn)
+        print(f"Resultados obtenidos: {len(player_data)} jugadores")
         conn.close()
         return player_data
     except Exception as e:
+        print(f"Error al ejecutar consulta: {e}")
         conn.close()
         return pd.DataFrame()
 
