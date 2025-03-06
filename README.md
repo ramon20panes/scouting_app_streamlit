@@ -33,13 +33,21 @@ Posibles dos nuevas páginas en un futuro.
 
 - **data**:
     api_handlers/football_data_api.py tratamiento de datos con la api
+
     data_processing/understat_data.py extracción xG de los partidos del Atleti, primero para la evolución temporal, después para cada jornada
+
     database/database.py tratamiento con la base de datos de las big_5_24_25 de FBREF
+
     FData/master archivos para mapear id y url y rutas de escudos de equipos, jugadores, y partidos. Actualizar tras jornadas understat y sofascore 
+
         matches csv y json para redes de pase desde whoscored (actualizar tras jornada)
+
         stats csv de clasificación y de estadísticas básicas de los partidos del atleti (actualizar tras jornada)
+
         stats_big5_24_25.db base de datos que se debe actualizar tras cada jornada (Sqlite)
+
     jornada_data/csv_lectura.py estadísticas de partido y lectura para red de pases
+                
                 url_mapeo.py sincronización para elección de jornada
     
 - **entorno**
