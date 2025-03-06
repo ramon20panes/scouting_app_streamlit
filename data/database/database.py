@@ -72,8 +72,28 @@ def get_players_atleti():
     """
     conn = get_connection()
     if not conn:
+        st.error("No se pudo establecer conexión con la base de datos")
         return pd.DataFrame()
     
+    # Prueba primero una consulta simple para verificar que podemos acceder a los datos
+    try:
+        simple_query = "SELECT COUNT(*) FROM jugadores"
+        result = pd.read_sql(simple_query, conn)
+        st.write(f"Número total de jugadores en la base de datos: {result.iloc[0, 0]}")
+        
+        # Verificar si hay jugadores del Atlético
+        atleti_query = "SELECT COUNT(*) FROM jugadores j JOIN estadisticas_jugador ej ON j.id_jugador = ej.id_jugador JOIN equipos e ON ej.id_equipo = e.id_equipo WHERE e.nombre LIKE '%Atl%'"
+        atleti_result = pd.read_sql(atleti_query, conn)
+        st.write(f"Número de jugadores del Atlético encontrados: {atleti_result.iloc[0, 0]}")
+        
+        # Ver los nombres de equipos disponibles
+        teams_query = "SELECT nombre FROM equipos LIMIT 10"
+        teams = pd.read_sql(teams_query, conn)
+        st.write("Algunos equipos disponibles:", teams['nombre'].tolist())
+    except Exception as e:
+        st.error(f"Error en consultas de prueba: {e}")
+    
+    # Consulta original
     query = """
     SELECT 
         j.nombre AS Jugador,
@@ -136,10 +156,14 @@ def get_players_atleti():
     """
     
     try:
+        st.write("Ejecutando consulta principal...")
         player_data = pd.read_sql(query, conn)
+        st.write(f"Consulta exitosa. Filas obtenidas: {len(player_data)}")
+        
         conn.close()
         return player_data
     except Exception as e:
+        st.error(f"Error en consulta principal: {e}")
         conn.close()
         return pd.DataFrame()
 
