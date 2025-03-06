@@ -112,7 +112,7 @@ def check_database_connection():
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
                 tables = cursor.fetchall()
                 conn.close()
-                return True  a
+                return True  
             except Exception:
                 pass  
     
