@@ -66,6 +66,9 @@ def get_connection():
 def get_players_atleti():
     """
     Obtiene los datos de los jugadores del Atlético de Madrid con todas sus estadísticas.
+    
+    Returns:
+        DataFrame: Datos de los jugadores del Atlético de Madrid
     """
     conn = get_connection()
     if not conn:
@@ -73,43 +76,14 @@ def get_players_atleti():
         return pd.DataFrame()
     
     try:
-        # 1. Primero verificar si hay equipos con 'Atl' en el nombre
-        query_equipos = "SELECT id_equipo, nombre FROM equipos WHERE nombre LIKE '%Atl%'"
-        equipos_df = pd.read_sql(query_equipos, conn)
-        st.write("Equipos encontrados:", equipos_df.to_dict())
+        # Primero obtener el ID del equipo Atlético
+        query_equipo = "SELECT id_equipo FROM equipos WHERE nombre LIKE '%Atl%' LIMIT 1"
+        cursor = conn.cursor()
+        cursor.execute(query_equipo)
+        equipo_id = cursor.fetchone()[0]
         
-        # Si no encontramos equipos, probemos una búsqueda más amplia
-        if equipos_df.empty:
-            st.warning("No se encontraron equipos con 'Atl' en el nombre, intentando búsqueda más amplia...")
-            query_todos = "SELECT id_equipo, nombre FROM equipos LIMIT 5"
-            todos_df = pd.read_sql(query_todos, conn)
-            st.write("Algunos equipos disponibles:", todos_df.to_dict())
-            return pd.DataFrame()  # No podemos continuar sin el Atlético
-        
-        # 2. Obtenemos el ID del equipo
-        equipo_id = equipos_df.iloc[0]['id_equipo']
-        st.write(f"ID del equipo seleccionado: {equipo_id}")
-        
-        # 3. Consulta simplificada para obtener solo datos básicos de jugadores
-        query_simple = f"""
-        SELECT 
-            j.nombre AS Jugador,
-            j.posicion AS Posición,
-            ej.minutos AS Minutos,
-            ej.partidos_jugados AS Partidos
-        FROM jugadores j
-        JOIN estadisticas_jugador ej ON j.id_jugador = ej.id_jugador
-        WHERE ej.id_equipo = {equipo_id}
-        ORDER BY ej.minutos DESC
-        LIMIT 5
-        """
-        
-        simple_df = pd.read_sql(query_simple, conn)
-        st.write("Datos básicos de 5 jugadores:", simple_df.to_dict())
-        
-        # 4. Si lo anterior funciona, ahora intentamos la consulta completa
-        # CORRECCIÓN: Usamos el valor real en lugar de la variable en llaves
-        query_completa = f"""
+        # Consulta principal usando parámetros directamente (más seguro)
+        query = """
         SELECT 
             j.nombre AS Jugador,
             j.nacionalidad AS Nacionalidad,
@@ -164,20 +138,16 @@ def get_players_atleti():
         JOIN estadisticas_posesion epos ON ej.id_estadistica = epos.id_estadistica
         JOIN estadisticas_defensivas ed ON ej.id_estadistica = ed.id_estadistica
         JOIN estadisticas_disciplina edis ON ej.id_estadistica = edis.id_estadistica
-        WHERE ej.id_equipo = {equipo_id}
+        WHERE ej.id_equipo = ? 
         AND ej.temporada = '2024-2025'
         ORDER BY ej.minutos DESC
         """
         
-        player_data = pd.read_sql(query_completa, conn)
-        st.write(f"Consulta completa exitosa. Filas obtenidas: {len(player_data)}")
-        
+        player_data = pd.read_sql(query, conn, params=(equipo_id,))
         conn.close()
         return player_data
     except Exception as e:
         st.error(f"Error en consulta: {str(e)}")
-        import traceback
-        st.error(f"Detalles: {traceback.format_exc()}")
         conn.close()
         return pd.DataFrame()
 
