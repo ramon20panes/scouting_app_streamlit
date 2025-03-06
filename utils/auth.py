@@ -3,7 +3,15 @@ import os
 import time
 from datetime import datetime, timedelta
 import traceback 
+import logging
 
+def setup_logging():
+    """Configura el registro de errores en un archivo"""
+    logging.basicConfig(
+        filename='streamlit_auth.log', 
+        level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 # Modificación para manejar credenciales
 def get_credentials():
     """
@@ -13,25 +21,22 @@ def get_credentials():
         # Primero intenta cargar de Streamlit secrets
         ADMIN_USER = st.secrets["STREAMLIT_USER"]
         ADMIN_PASSWORD = st.secrets["STREAMLIT_PASSWORD"]
-        print("DEPURACION: Secrets cargados correctamente desde Streamlit")
-        print(f"DEPURACION: Usuario obtenido: {ADMIN_USER}")
+        logging.info(f"Secrets cargados correctamente. Usuario: {ADMIN_USER}")
     except Exception as e:
-        # Cambio aquí para un debug más detallado
-        print("DEPURACION: Error al cargar secrets")
-        print(f"Tipo de error: {type(e).__name__}")
-        print(f"Detalles del error: {str(e)}")
-        traceback.print_exc()  # Esto imprimirá el stack trace completo
-        
-        # Si falla, intenta cargar de variables de entorno locales
-        from dotenv import load_dotenv
-        load_dotenv()
-        ADMIN_USER = os.getenv('STREAMLIT_USER')
-        ADMIN_PASSWORD = os.getenv('STREAMLIT_PASSWORD')
-        print(f"DEPURACION: Intentando cargar de variables de entorno. Usuario: {ADMIN_USER}")
+        logging.error(f"Error al cargar secrets: {str(e)}")
+        try:
+            # Si falla, intenta cargar de variables de entorno locales
+            from dotenv import load_dotenv
+            load_dotenv()
+            ADMIN_USER = os.getenv('STREAMLIT_USER')
+            ADMIN_PASSWORD = os.getenv('STREAMLIT_PASSWORD')
+            logging.info(f"Cargando de variables de entorno. Usuario: {ADMIN_USER}")
+        except Exception as env_error:
+            logging.error(f"Error al cargar variables de entorno: {str(env_error)}")
+            raise
     
     return ADMIN_USER, ADMIN_PASSWORD
 
-# El resto de tu código de autenticación permanece igual
 def check_session_timeout():
     """Verifica si la sesión ha expirado"""
     SESSION_TIMEOUT = 1800  # Definir aquí también
@@ -51,24 +56,28 @@ def update_last_activity():
 
 def login():
     """Maneja la autenticación del usuario"""
+    # Configurar logging al inicio
+    setup_logging()
+    
     SESSION_TIMEOUT = 1800  # 30 minutos en segundos
     
     if "authentication_status" not in st.session_state:
         st.session_state.authentication_status = False
     
+    try:
+        # Intentar obtener credenciales
+        ADMIN_USER, ADMIN_PASSWORD = get_credentials()
+        logging.info(f"Credenciales obtenidas para usuario: {ADMIN_USER}")
+    except Exception as e:
+        logging.error(f"Error crítico al obtener credenciales: {str(e)}")
+        st.error("Error en la configuración de autenticación")
+        return
+
     username = st.text_input("Usuario", key="username")
     password = st.text_input("Contraseña", type="password", key="password")
     
-    # Obtener credenciales de manera unificada
-    try:
-        ADMIN_USER, ADMIN_PASSWORD = get_credentials()
-        st.write(f"DEPURACION: Credenciales obtenidas. Usuario esperado: {ADMIN_USER}")
-    except Exception as e:
-        st.error(f"Error al obtener credenciales: {str(e)}")
-        return
-    
     if st.button("Login", key="login_button"):
-        st.write(f"DEPURACION: Comparando usuario ingresado '{username}' con usuario esperado '{ADMIN_USER}'")
+        logging.info(f"Intento de login con usuario: {username}")
         
         if username == ADMIN_USER and password == ADMIN_PASSWORD:
             st.session_state.authentication_status = True
@@ -78,8 +87,8 @@ def login():
             st.session_state.redirect_to = "1_📊Stats 24 25"
             st.rerun()
         else:
+            logging.warning(f"Intento de login fallido para usuario: {username}")
             st.error('Usuario o contraseña incorrectos', icon="🚨")
-            st.write(f"DEPURACION: Login fallido. Usuario ingresado: {username}")
 
 # Resto de las funciones igual que en tu código original
 def logout():
