@@ -1,3 +1,4 @@
+import streamlit as st
 import sqlite3
 import pandas as pd
 import os
@@ -6,13 +7,39 @@ from pathlib import Path
 # Obtener la ruta absoluta a la base de datos
 DB_PATH = Path(__file__).parent.parent / "FData/stats/stats_big5_24_25.db"
 
+
+def get_db_path():
+    """
+    Obtiene la ruta de la base de datos de manera más flexible
+    """
+    # Lista de posibles rutas
+    possible_paths = [
+        Path(__file__).parent.parent / "FData/stats/stats_big5_24_25.db",
+        Path("data/FData/stats/stats_big5_24_25.db"),
+        Path("/mount/src/scouting_app_streamlit/data/FData/stats/stats_big5_24_25.db")
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            st.write(f"Base de datos encontrada en: {path}")
+            return path
+    
+    st.error("No se encontró la base de datos")
+    return None
+
 def get_connection():
     """Establece conexión con la base de datos SQLite."""
+    DB_PATH = get_db_path()
+    
+    if DB_PATH is None:
+        st.error("No se puede establecer conexión con la base de datos")
+        return None
+    
     try:        
         conn = sqlite3.connect(DB_PATH)
         return conn
     except Exception as e:
-        print(f"Error al conectar con la base de datos: {e}")
+        st.error(f"Error al conectar con la base de datos: {e}")
         return None
 
 def get_players_atleti():
