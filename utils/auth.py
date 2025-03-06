@@ -12,12 +12,15 @@ def get_credentials():
         # Primero intenta cargar de Streamlit secrets
         ADMIN_USER = st.secrets["STREAMLIT_USER"]
         ADMIN_PASSWORD = st.secrets["STREAMLIT_PASSWORD"]
+        print(f"Secrets cargados: User={ADMIN_USER}, Password={'*' * len(ADMIN_PASSWORD)}")
     except:
+        print(f"Error al cargar secrets: {e}")
         # Si falla, intenta cargar de variables de entorno locales
         from dotenv import load_dotenv
         load_dotenv()
         ADMIN_USER = os.getenv('STREAMLIT_USER')
         ADMIN_PASSWORD = os.getenv('STREAMLIT_PASSWORD')
+        print(f"Env vars cargadas: User={ADMIN_USER}, Password={'*' * len(ADMIN_PASSWORD)}")
     
     return ADMIN_USER, ADMIN_PASSWORD
 
@@ -51,8 +54,13 @@ def login():
     
     # Obtener credenciales de manera unificada
     ADMIN_USER, ADMIN_PASSWORD = get_credentials()
+
+    st.write(f"DEBUG: Intentando login con usuario '{username}'")
     
     if st.button("Login", key="login_button"):
+        st.write(f"DEBUG: Comparando '{username}' con '{ADMIN_USER}'")
+        st.write(f"DEBUG: Comparando password")
+        
         if username == ADMIN_USER and password == ADMIN_PASSWORD:
             st.session_state.authentication_status = True
             st.session_state.last_activity = datetime.now()
