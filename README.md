@@ -39,6 +39,7 @@ Posibles dos nuevas páginas en un futuro.
     - database/database.py tratamiento con la base de datos de las big_5_24_25 de FBREF
 
     - FData/
+
     master archivos para mapear id y url y rutas de escudos de equipos, jugadores, y partidos. Actualizar tras jornadas understat y sofascore 
 
     matches csv y json para redes de pase desde whoscored (actualizar tras jornada)
@@ -49,7 +50,7 @@ Posibles dos nuevas páginas en un futuro.
 
     - jornada_data/csv_lectura.py estadísticas de partido y lectura para red de pases
                 
-                url_mapeo.py sincronización para elección de jornada
+    url_mapeo.py sincronización para elección de jornada
     
 - **entorno**
 
