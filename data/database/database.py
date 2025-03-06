@@ -66,104 +66,118 @@ def get_connection():
 def get_players_atleti():
     """
     Obtiene los datos de los jugadores del Atlético de Madrid con todas sus estadísticas.
-    
-    Returns:
-        DataFrame: Datos de los jugadores del Atlético de Madrid
     """
     conn = get_connection()
     if not conn:
         st.error("No se pudo establecer conexión con la base de datos")
         return pd.DataFrame()
     
-    # Prueba primero una consulta simple para verificar que podemos acceder a los datos
     try:
-        simple_query = "SELECT COUNT(*) FROM jugadores"
-        result = pd.read_sql(simple_query, conn)
-        st.write(f"Número total de jugadores en la base de datos: {result.iloc[0, 0]}")
+        # 1. Primero verificar si hay equipos con 'Atl' en el nombre
+        query_equipos = "SELECT id_equipo, nombre FROM equipos WHERE nombre LIKE '%Atl%'"
+        equipos_df = pd.read_sql(query_equipos, conn)
+        st.write("Equipos encontrados:", equipos_df.to_dict())
         
-        # Verificar si hay jugadores del Atlético
-        atleti_query = "SELECT COUNT(*) FROM jugadores j JOIN estadisticas_jugador ej ON j.id_jugador = ej.id_jugador JOIN equipos e ON ej.id_equipo = e.id_equipo WHERE e.nombre LIKE '%Atl%'"
-        atleti_result = pd.read_sql(atleti_query, conn)
-        st.write(f"Número de jugadores del Atlético encontrados: {atleti_result.iloc[0, 0]}")
+        # Si no encontramos equipos, probemos una búsqueda más amplia
+        if equipos_df.empty:
+            st.warning("No se encontraron equipos con 'Atl' en el nombre, intentando búsqueda más amplia...")
+            query_todos = "SELECT id_equipo, nombre FROM equipos LIMIT 5"
+            todos_df = pd.read_sql(query_todos, conn)
+            st.write("Algunos equipos disponibles:", todos_df.to_dict())
+            return pd.DataFrame()  # No podemos continuar sin el Atlético
         
-        # Ver los nombres de equipos disponibles
-        teams_query = "SELECT nombre FROM equipos LIMIT 10"
-        teams = pd.read_sql(teams_query, conn)
-        st.write("Algunos equipos disponibles:", teams['nombre'].tolist())
-    except Exception as e:
-        st.error(f"Error en consultas de prueba: {e}")
-    
-    # Consulta original
-    query = """
-    SELECT 
-        j.nombre AS Jugador,
-        j.nacionalidad AS Nacionalidad,
-        j.posicion AS Posición,
-        j.edad AS Edad,
-        j.fecha_nacimiento AS Nacimiento,
-        ej.minutos AS Minutos,
-        ej.partidos_jugados AS Partidos,
-        ej.titularidades AS Titularidades,
-        ej.porcentaje_min_equipo AS "% Minutos equipo",
-        eo.goles AS Goles,
-        eo.goles_sin_penales AS "Goles sin penales",
-        eo.asistencias AS Asistencias,
-        eo.goles_asistencias AS "Goles+Asistencias",
-        eo.xG AS xG,
-        eo.xA AS xA,
-        eo.xAG AS xAG,
-        eo.npxG AS npxG,
-        eo.npxG_xAG AS "npxG+xA",
-        eo.tiros AS Tiros,
-        eo.tiros_puerta AS "Tiros a puerta",
-        eo.tiros_por_90 AS "Tiros por 90",
-        ep.pases_clave AS "Pases clave",
-        ep.porcentaje_pases_completados AS "% Pases completados",
-        ep.pases_ultimo_tercio AS "Pases último tercio",
-        ep.pases_area_penal AS "Pases al área",
-        ep.pases_centros AS "Centros",
-        ep.pases_progresivos AS "Pases progresivos",
-        epos.toques AS Toques,
-        epos.regates_exitosos AS "Regates completados",
-        epos.porcentaje_regate AS "% Regate exitoso",
-        epos.conducciones_progresivas AS "Conducciones progresivas",
-        epos.controles_errados AS "Controles errados",
-        epos.desposesiones AS Desposesiones,
-        ed.entradas AS Entradas,
-        ed.intercepciones AS Intercepciones,
-        ed.entradas_intercepciones AS "Entradas+Intercepciones",
-        ed.despejes AS Despejes,
-        ed.bloqueos AS Bloqueos,
-        ed.tackles_ganados AS "Duelos ganados",
-        ed.recuperaciones AS Recuperaciones,
-        ed.porcentaje_duelos_aereos AS "% Duelos aéreos",
-        edis.tarjetas_amarillas AS "Tarjetas amarillas",
-        edis.tarjetas_rojas AS "Tarjetas rojas",
-        edis.faltas_cometidas AS "Faltas cometidas",
-        edis.faltas_recibidas AS "Faltas recibidas",
-        edis.fueras_juego AS "Fueras de juego"
-    FROM jugadores j
-    JOIN estadisticas_jugador ej ON j.id_jugador = ej.id_jugador
-    JOIN estadisticas_ofensivas eo ON ej.id_estadistica = eo.id_estadistica
-    JOIN estadisticas_pases ep ON ej.id_estadistica = ep.id_estadistica
-    JOIN estadisticas_posesion epos ON ej.id_estadistica = epos.id_estadistica
-    JOIN estadisticas_defensivas ed ON ej.id_estadistica = ed.id_estadistica
-    JOIN estadisticas_disciplina edis ON ej.id_estadistica = edis.id_estadistica
-    JOIN equipos e ON ej.id_equipo = e.id_equipo
-    WHERE e.nombre LIKE '%Atl%' 
-    AND ej.temporada = '2024-2025'
-    ORDER BY ej.minutos DESC
-    """
-    
-    try:
-        st.write("Ejecutando consulta principal...")
-        player_data = pd.read_sql(query, conn)
-        st.write(f"Consulta exitosa. Filas obtenidas: {len(player_data)}")
+        # 2. Obtenemos el ID del equipo
+        equipo_id = equipos_df.iloc[0]['id_equipo']
+        st.write(f"ID del equipo seleccionado: {equipo_id}")
+        
+        # 3. Consulta simplificada para obtener solo datos básicos de jugadores
+        query_simple = f"""
+        SELECT 
+            j.nombre AS Jugador,
+            j.posicion AS Posición,
+            ej.minutos AS Minutos,
+            ej.partidos_jugados AS Partidos
+        FROM jugadores j
+        JOIN estadisticas_jugador ej ON j.id_jugador = ej.id_jugador
+        WHERE ej.id_equipo = {equipo_id}
+        ORDER BY ej.minutos DESC
+        LIMIT 5
+        """
+        
+        simple_df = pd.read_sql(query_simple, conn)
+        st.write("Datos básicos de 5 jugadores:", simple_df.to_dict())
+        
+        # 4. Si lo anterior funciona, ahora intentamos la consulta completa
+        # CORRECCIÓN: Usamos el valor real en lugar de la variable en llaves
+        query_completa = f"""
+        SELECT 
+            j.nombre AS Jugador,
+            j.nacionalidad AS Nacionalidad,
+            j.posicion AS Posición,
+            j.edad AS Edad,
+            j.fecha_nacimiento AS Nacimiento,
+            ej.minutos AS Minutos,
+            ej.partidos_jugados AS Partidos,
+            ej.titularidades AS Titularidades,
+            ej.porcentaje_min_equipo AS "% Minutos equipo",
+            eo.goles AS Goles,
+            eo.goles_sin_penales AS "Goles sin penales",
+            eo.asistencias AS Asistencias,
+            eo.goles_asistencias AS "Goles+Asistencias",
+            eo.xG AS xG,
+            eo.xA AS xA,
+            eo.xAG AS xAG,
+            eo.npxG AS npxG,
+            eo.npxG_xAG AS "npxG+xA",
+            eo.tiros AS Tiros,
+            eo.tiros_puerta AS "Tiros a puerta",
+            eo.tiros_por_90 AS "Tiros por 90",
+            ep.pases_clave AS "Pases clave",
+            ep.porcentaje_pases_completados AS "% Pases completados",
+            ep.pases_ultimo_tercio AS "Pases último tercio",
+            ep.pases_area_penal AS "Pases al área",
+            ep.pases_centros AS "Centros",
+            ep.pases_progresivos AS "Pases progresivos",
+            epos.toques AS Toques,
+            epos.regates_exitosos AS "Regates completados",
+            epos.porcentaje_regate AS "% Regate exitoso",
+            epos.conducciones_progresivas AS "Conducciones progresivas",
+            epos.controles_errados AS "Controles errados",
+            epos.desposesiones AS Desposesiones,
+            ed.entradas AS Entradas,
+            ed.intercepciones AS Intercepciones,
+            ed.entradas_intercepciones AS "Entradas+Intercepciones",
+            ed.despejes AS Despejes,
+            ed.bloqueos AS Bloqueos,
+            ed.tackles_ganados AS "Duelos ganados",
+            ed.recuperaciones AS Recuperaciones,
+            ed.porcentaje_duelos_aereos AS "% Duelos aéreos",
+            edis.tarjetas_amarillas AS "Tarjetas amarillas",
+            edis.tarjetas_rojas AS "Tarjetas rojas",
+            edis.faltas_cometidas AS "Faltas cometidas",
+            edis.faltas_recibidas AS "Faltas recibidas",
+            edis.fueras_juego AS "Fueras de juego"
+        FROM jugadores j
+        JOIN estadisticas_jugador ej ON j.id_jugador = ej.id_jugador
+        JOIN estadisticas_ofensivas eo ON ej.id_estadistica = eo.id_estadistica
+        JOIN estadisticas_pases ep ON ej.id_estadistica = ep.id_estadistica
+        JOIN estadisticas_posesion epos ON ej.id_estadistica = epos.id_estadistica
+        JOIN estadisticas_defensivas ed ON ej.id_estadistica = ed.id_estadistica
+        JOIN estadisticas_disciplina edis ON ej.id_estadistica = edis.id_estadistica
+        WHERE ej.id_equipo = {equipo_id}
+        AND ej.temporada = '2024-2025'
+        ORDER BY ej.minutos DESC
+        """
+        
+        player_data = pd.read_sql(query_completa, conn)
+        st.write(f"Consulta completa exitosa. Filas obtenidas: {len(player_data)}")
         
         conn.close()
         return player_data
     except Exception as e:
-        st.error(f"Error en consulta principal: {e}")
+        st.error(f"Error en consulta: {str(e)}")
+        import traceback
+        st.error(f"Detalles: {traceback.format_exc()}")
         conn.close()
         return pd.DataFrame()
 
