@@ -9,7 +9,7 @@ DB_PATH = Path(__file__).parent.parent / "FData/stats/stats_big5_24_25.db"
 
 def get_db_path():
     """
-    Obtiene la ruta de la base de datos de manera más flexible y con información de depuración
+    Obtiene la ruta de la base de datos de manera más flexible
     """
     # Lista de posibles rutas
     possible_paths = [
@@ -20,24 +20,6 @@ def get_db_path():
         Path(os.getcwd()) / "data/FData/stats/stats_big5_24_25.db",
         Path(os.path.dirname(os.path.dirname(__file__))) / "FData/stats/stats_big5_24_25.db"
     ]
-    
-    # Mostrar información de depuración en un expander
-    with st.expander("Información de depuración de la base de datos", expanded=False):
-        st.write("Directorio actual:", os.getcwd())
-        st.write("Contenido del directorio actual:", os.listdir("."))
-        
-        if os.path.exists("data"):
-            st.write("Contenido de 'data':", os.listdir("data"))
-            
-            if os.path.exists("data/FData"):
-                st.write("Contenido de 'data/FData':", os.listdir("data/FData"))
-                
-                if os.path.exists("data/FData/stats"):
-                    st.write("Contenido de 'data/FData/stats':", os.listdir("data/FData/stats"))
-        
-        st.write("Comprobando rutas posibles:")
-        for path in possible_paths:
-            st.write(f"- {path}: {'Existe' if path.exists() else 'No existe'}")
     
     # Buscar la base de datos en las rutas posibles
     for path in possible_paths:
