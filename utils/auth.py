@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import time
 from datetime import datetime, timedelta
+import traceback 
 
 # Modificación para manejar credenciales
 def get_credentials():
@@ -12,15 +13,21 @@ def get_credentials():
         # Primero intenta cargar de Streamlit secrets
         ADMIN_USER = st.secrets["STREAMLIT_USER"]
         ADMIN_PASSWORD = st.secrets["STREAMLIT_PASSWORD"]
-        print(f"Secrets cargados: User={ADMIN_USER}, Password={'*' * len(ADMIN_PASSWORD)}")
-    except:
-        print(f"Error al cargar secrets: {e}")
+        print("DEPURACION: Secrets cargados correctamente desde Streamlit")
+        print(f"DEPURACION: Usuario obtenido: {ADMIN_USER}")
+    except Exception as e:
+        # Cambio aquí para un debug más detallado
+        print("DEPURACION: Error al cargar secrets")
+        print(f"Tipo de error: {type(e).__name__}")
+        print(f"Detalles del error: {str(e)}")
+        traceback.print_exc()  # Esto imprimirá el stack trace completo
+        
         # Si falla, intenta cargar de variables de entorno locales
         from dotenv import load_dotenv
         load_dotenv()
         ADMIN_USER = os.getenv('STREAMLIT_USER')
         ADMIN_PASSWORD = os.getenv('STREAMLIT_PASSWORD')
-        print(f"Env vars cargadas: User={ADMIN_USER}, Password={'*' * len(ADMIN_PASSWORD)}")
+        print(f"DEPURACION: Intentando cargar de variables de entorno. Usuario: {ADMIN_USER}")
     
     return ADMIN_USER, ADMIN_PASSWORD
 
@@ -53,13 +60,15 @@ def login():
     password = st.text_input("Contraseña", type="password", key="password")
     
     # Obtener credenciales de manera unificada
-    ADMIN_USER, ADMIN_PASSWORD = get_credentials()
-
-    st.write(f"DEBUG: Intentando login con usuario '{username}'")
+    try:
+        ADMIN_USER, ADMIN_PASSWORD = get_credentials()
+        st.write(f"DEPURACION: Credenciales obtenidas. Usuario esperado: {ADMIN_USER}")
+    except Exception as e:
+        st.error(f"Error al obtener credenciales: {str(e)}")
+        return
     
     if st.button("Login", key="login_button"):
-        st.write(f"DEBUG: Comparando '{username}' con '{ADMIN_USER}'")
-        st.write(f"DEBUG: Comparando password")
+        st.write(f"DEPURACION: Comparando usuario ingresado '{username}' con usuario esperado '{ADMIN_USER}'")
         
         if username == ADMIN_USER and password == ADMIN_PASSWORD:
             st.session_state.authentication_status = True
@@ -70,6 +79,7 @@ def login():
             st.rerun()
         else:
             st.error('Usuario o contraseña incorrectos', icon="🚨")
+            st.write(f"DEPURACION: Login fallido. Usuario ingresado: {username}")
 
 # Resto de las funciones igual que en tu código original
 def logout():
