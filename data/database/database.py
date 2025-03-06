@@ -130,6 +130,12 @@ def get_players_atleti():
         print("Ejecutando consulta...")
         player_data = pd.read_sql(query, conn)
         print(f"Resultados obtenidos: {len(player_data)} jugadores")
+    
+        # Añade estas líneas nuevas
+        print("Columnas devueltas:", player_data.columns.tolist())
+        print("Primeras filas:")
+        print(player_data.head())
+    
         conn.close()
         return player_data
     except Exception as e:
@@ -227,3 +233,4 @@ def categorize_metrics(columns):
             categorized[category].append(col)
     
     return categorized
+    
