@@ -97,30 +97,6 @@ div[data-testid="stTabContent"] {
 def load_data():
     return get_players_atleti()
 
-# Función de diagnóstico
-def check_database_connection():
-    """Verifica la conexión a la base de datos silenciosamente"""
-    for path in [
-        Path("data/FData/stats/stats_big5_24_25.db"),
-        Path("./data/FData/stats/stats_big5_24_25.db"),
-        Path("/mount/src/scouting_app_streamlit/data/FData/stats/stats_big5_24_25.db")
-    ]:
-        if path.exists():
-            try:
-                conn = sqlite3.connect(path)
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-                tables = cursor.fetchall()
-                conn.close()
-                return True  
-            except Exception:
-                pass  
-    
-    return False  # No se pudo conectar a ninguna BD
-
-# Verificar silenciosamente
-db_ok = check_database_connection()
-
 # Después de esto, código intocable
 player_data = load_data()
 
