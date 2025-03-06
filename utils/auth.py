@@ -9,7 +9,7 @@ def setup_logging():
     """Configura el registro de errores en un archivo"""
     logging.basicConfig(
         filename='streamlit_auth.log', 
-        level=logging.DEBUG,
+        level=logging.ERROR,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 # Modificación para manejar credenciales
@@ -21,7 +21,7 @@ def get_credentials():
         # Primero intenta cargar de Streamlit secrets
         ADMIN_USER = st.secrets["STREAMLIT_USER"]
         ADMIN_PASSWORD = st.secrets["STREAMLIT_PASSWORD"]
-        logging.info(f"Secrets cargados correctamente. Usuario: {ADMIN_USER}")
+        
     except Exception as e:
         logging.error(f"Error al cargar secrets: {str(e)}")
         try:
@@ -30,7 +30,7 @@ def get_credentials():
             load_dotenv()
             ADMIN_USER = os.getenv('STREAMLIT_USER')
             ADMIN_PASSWORD = os.getenv('STREAMLIT_PASSWORD')
-            logging.info(f"Cargando de variables de entorno. Usuario: {ADMIN_USER}")
+            
         except Exception as env_error:
             logging.error(f"Error al cargar variables de entorno: {str(env_error)}")
             raise
@@ -67,9 +67,9 @@ def login():
     try:
         # Intentar obtener credenciales
         ADMIN_USER, ADMIN_PASSWORD = get_credentials()
-        logging.info(f"Credenciales obtenidas para usuario: {ADMIN_USER}")
+        
     except Exception as e:
-        logging.error(f"Error crítico al obtener credenciales: {str(e)}")
+        
         st.error("Error en la configuración de autenticación")
         return
 
@@ -77,7 +77,6 @@ def login():
     password = st.text_input("Contraseña", type="password", key="password")
     
     if st.button("Login", key="login_button"):
-        logging.info(f"Intento de login con usuario: {username}")
         
         if username == ADMIN_USER and password == ADMIN_PASSWORD:
             st.session_state.authentication_status = True
