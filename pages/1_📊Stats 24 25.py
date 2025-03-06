@@ -11,6 +11,8 @@ import base64
 from datetime import datetime
 from utils.styles import load_all_styles
 
+import os
+
 # Configuración de la página
 st.set_page_config(
     page_title="Atlético de Madrid 24/25",
@@ -91,10 +93,55 @@ div[data-testid="stTabContent"] {
 # Sección 1, tabla métricas
 
 # Cargar datos de jugadores del Atlético
+# Cargar datos de jugadores del Atlético
 @st.cache_data(ttl=3600)
 def load_data():
     return get_players_atleti()
 
+# Añade la función de diagnóstico aquí
+def check_database_connection():
+    """Verifica la conexión a la base de datos y muestra información de diagnóstico"""
+        
+    st.subheader("Diagnóstico de la base de datos")
+    
+    # Mostrar información del entorno
+    st.write("Directorio de trabajo:", os.getcwd())
+    
+    # Comprobar las rutas posibles
+    paths_to_check = [
+        Path("data/FData/stats/stats_big5_24_25.db"),
+        Path("./data/FData/stats/stats_big5_24_25.db"),
+        Path("/mount/src/scouting_app_streamlit/data/FData/stats/stats_big5_24_25.db")
+    ]
+    
+    for path in paths_to_check:
+        exists = path.exists()
+        st.write(f"Ruta: {path}")
+        st.write(f"  - Existe: {exists}")
+        
+        if exists:
+            try:
+                # Intentar abrir la base de datos
+                conn = sqlite3.connect(path)
+                cursor = conn.cursor()
+                
+                # Comprobar si hay tablas
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                tables = cursor.fetchall()
+                
+                st.write(f"  - Conexión exitosa")
+                st.write(f"  - Tablas encontradas: {len(tables)}")
+                st.write(f"  - Nombres de tablas: {[t[0] for t in tables]}")
+                
+                conn.close()
+                st.success(f"La base de datos en {path} es accesible y contiene {len(tables)} tablas.")
+            except Exception as e:
+                st.error(f"Error al conectar a {path}: {e}")
+
+# Llama a la función de diagnóstico
+check_database_connection()
+
+# Después de esto, continúa con el código original
 player_data = load_data()
 
 if player_data.empty:
