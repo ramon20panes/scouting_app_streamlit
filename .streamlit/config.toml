@@ -4,6 +4,8 @@ backgroundColor = "#E6E6E6"  # Gris mediano para el fondo principal
 secondaryBackgroundColor = "#D3D3D3"  # Gris claro para elementos secundarios
 textColor = "#001F3F"  # Azul oscuro para textos
 font = "sans serif"  # Fuente de respaldo
+
 [server]
 enableCORS = false
 enableXsrfProtection = false
+fileWatcherType = "none"
