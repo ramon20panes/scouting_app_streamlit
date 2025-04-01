@@ -127,11 +127,52 @@ def get_players_atleti():
         
         player_data = pd.read_sql(query, conn, params=(equipo_id,))
         conn.close()
-        return player_data
+        # Formatear datos numéricos antes de devolverlos
+        return format_player_data(player_data)
     except Exception as e:
         st.error(f"Error en consulta: {str(e)}")
         conn.close()
         return pd.DataFrame()
+    
+def format_player_data(player_data):
+    """
+    Formatea los datos numéricos del DataFrame para mejor visualización.
+    
+    Args:
+        player_data (DataFrame): DataFrame con datos de jugadores
+        
+    Returns:
+        DataFrame: DataFrame con valores numéricos formateados
+    """
+    # Crear una copia para no modificar el original
+    formatted_data = player_data.copy()
+    
+    # Columnas que deben ser texto (no formatear)
+    text_columns = ["Jugador", "Nacionalidad", "Posición", "Nacimiento"]
+    
+    # Columnas con 2 decimales
+    decimal_columns = [
+        "xG", "xA", "xAG", "npxG", "npxG+xA", "Tiros por 90",
+        "% Minutos equipo", "% Pases completados", "% Regate exitoso", "% Duelos aéreos"
+    ]
+    
+    # Formatear cada columna
+    for col in formatted_data.columns:
+        if col not in text_columns:
+            if col in decimal_columns:
+                # Redondear a 2 decimales
+                formatted_data[col] = pd.to_numeric(formatted_data[col], errors='coerce')
+                formatted_data[col] = formatted_data[col].apply(
+                    lambda x: round(x, 2) if pd.notnull(x) else x
+                )
+            else:
+                # Convertir a entero
+                formatted_data[col] = pd.to_numeric(formatted_data[col], errors='coerce')
+                formatted_data[col] = formatted_data[col].apply(
+                    lambda x: int(x) if pd.notnull(x) else x
+                )
+    
+    return formatted_data
 
 def get_team_by_id(team_id):
     """

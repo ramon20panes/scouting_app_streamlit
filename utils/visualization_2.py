@@ -112,15 +112,22 @@ def plot_team_metrics(match_stats, local_info, visitante_info):
                 visitante_value = visitante_stats[metric]
                 
                 # Formatear valores: enteros para todo excepto xG y Precisión
-                if metric == 'xG':
-                    local_value = f"{float(local_value):.2f}" if isinstance(local_value, (int, float)) else local_value
-                    visitante_value = f"{float(visitante_value):.2f}" if isinstance(visitante_value, (int, float)) else visitante_value
-                elif metric == 'Precisión de Pases' or metric == 'Posesión':
-                    local_value = f"{float(local_value):.2f}%" if isinstance(local_value, (int, float)) else local_value
-                    visitante_value = f"{float(visitante_value):.2f}%" if isinstance(visitante_value, (int, float)) else visitante_value
-                else:
-                    local_value = f"{int(float(local_value))}" if isinstance(local_value, (int, float)) else local_value
-                    visitante_value = f"{int(float(visitante_value))}" if isinstance(visitante_value, (int, float)) else visitante_value
+                try:
+                    if metric == 'xG':
+                        local_value = f"{float(local_value):.2f}" if pd.notna(local_value) and str(local_value).replace('.', '', 1).isdigit() else local_value
+                        visitante_value = f"{float(visitante_value):.2f}" if pd.notna(visitante_value) and str(visitante_value).replace('.', '', 1).isdigit() else visitante_value
+                    elif metric == 'Precisión de Pases' or metric == 'Posesión':
+                        local_value = f"{float(local_value):.2f}%" if pd.notna(local_value) and str(local_value).replace('.', '', 1).isdigit() else local_value
+                        visitante_value = f"{float(visitante_value):.2f}%" if pd.notna(visitante_value) and str(visitante_value).replace('.', '', 1).isdigit() else visitante_value
+                    else:
+                        # Para valores enteros, primero convertimos a float y luego a entero
+                        if pd.notna(local_value) and str(local_value).replace('.', '', 1).isdigit():
+                            local_value = f"{int(float(local_value))}"
+                        if pd.notna(visitante_value) and str(visitante_value).replace('.', '', 1).isdigit():
+                            visitante_value = f"{int(float(visitante_value))}"
+                except Exception as e:
+                    # Si hay error de conversión, dejamos los valores como están
+                    print(f"Error al formatear valores para {metric}: {e}")
                 
                 # Crear fila para la tabla
                 row = {
@@ -161,9 +168,15 @@ def plot_team_metrics(match_stats, local_info, visitante_info):
                 return ['', '', '']
         
         # Usar st.dataframe en lugar de st.table para scroll
+        # Convertir a string para evitar problemas de serialización con Arrow
+        comparison_df_safe = comparison_df.copy()
+        for col in comparison_df_safe.columns:
+            comparison_df_safe[col] = comparison_df_safe[col].astype(str)
+
+        # Usar st.dataframe con los datos convertidos a strings
         st.dataframe(
-            comparison_df.style.apply(highlight_better, axis=1),
-            height=300,  # Altura fija
+            comparison_df_safe.style.apply(highlight_better, axis=1),
+            height=300,  # Altura fijas
             use_container_width=True  # Ocupa todo el ancho disponible
         )
 

@@ -326,24 +326,29 @@ with footer_container:
         """, unsafe_allow_html=True)
 
 with st.sidebar:
-    # Espacio flexible
-    st.markdown('<div style="flex-grow: 1;"></div>', unsafe_allow_html=True)
+    # Espacio flexible (empuja los botones hacia abajo)
+    st.markdown('<div style="flex: 1;"></div>', unsafe_allow_html=True)
     
-    # Botones al final
-    container = st.container()
-    with container:
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Back"):
-                if len(st.session_state.page_history) > 1:
-                    # Quitar página actual
-                    st.session_state.page_history.pop()
-                    # Ir a página anterior
-                    previous_page = st.session_state.page_history[-1]
-                    st.switch_page(f"pages/{previous_page}")
-        with col2:
-            if st.button("Exit"):
-                logout()
+    # Corrección de orientación del texto en botones
+    st.markdown("""
+        <style>
+        .stButton button {
+            writing-mode: horizontal-tb !important;
+            text-align: center !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Botón Back
+    if st.button("Back", key="back_button", use_container_width=True):
+        if 'page_history' in st.session_state and len(st.session_state.page_history) > 1:
+            st.session_state.page_history.pop()
+            previous_page = st.session_state.page_history[-1]
+            st.switch_page(f"pages/{previous_page}")
+    
+    # Botón Exit
+    if st.button("Exit", key="exit_button", use_container_width=True):
+        logout()
 
     # CSS para posicionar los botones
     st.markdown("""

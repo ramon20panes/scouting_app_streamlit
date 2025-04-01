@@ -48,7 +48,25 @@ def load_match_stats(match_id=None, jornada=None, partido=None):
     
     # Cargar el CSV
     try:
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, dtype=str)
+
+        # Identificar columnas numéricas conocidas
+        numeric_columns = ['Jornada', 'Goles', 'Tiros a Puerta', 'Tiros Fuera', 'Tiros Totales', 
+                          'Tiros Bloqueados', 'Tiros Dentro Area', 'Tiros Fuera Area', 
+                          'Faltas', 'CÃ³rners', 'Fueras de Juego', 'PosesiÃ³n', 
+                          'Tarjetas Amarillas', 'Tarjetas Rojas', 'Paradas', 
+                          'Pases Totales', 'Pases Completados', 'PrecisiÃ³n de Pases', 
+                          'xG', 'Goles Evitados']
+        
+        # Convertir solo las columnas conocidas a float, ignorando errores
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Para las columnas de equipos (como "Villarreal CF"), intentar convertir a float
+        for col in df.columns:
+            if col not in numeric_columns and col not in ['Equipo', 'Partido', 'Resultado']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
                 
         # Filtrar por jornada si se proporciona
         if jornada is not None:

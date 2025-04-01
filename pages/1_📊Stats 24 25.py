@@ -150,6 +150,33 @@ else:
     # Mantener las métricas básicas sí o sí y agregar solo las seleccionadas que existan en los datos
     display_columns = basic_metrics + [col for col in selected_table_metrics if col in filtered_players.columns]
 
+    # Copiar los datos filtrados para no modificar los originales
+    filtered_display = filtered_players[display_columns].copy()
+
+    # Formatear columnas numéricas para mostrar mejor los valores
+    for col in filtered_display.columns:
+        if col not in ["Jugador", "Posición", "Nacionalidad"]:  # Excluir columnas de texto
+            # Detectar si la columna debe mostrar decimales
+            if col in ["xG", "xA", "xAG", "npxG", "npxG+xA", "Tiros por 90", "% Minutos equipo", "% Pases completados", "% Regate exitoso", "% Duelos aéreos"]:
+                # Formatear a 2 decimales
+                filtered_display[col] = pd.to_numeric(filtered_display[col], errors='coerce')
+                filtered_display[col] = filtered_display[col].apply(
+                    lambda x: round(x, 2) if pd.notna(x) else x
+                )
+            else:
+                # Formatear como entero
+                filtered_display[col] = pd.to_numeric(filtered_display[col], errors='coerce')
+                filtered_display[col] = filtered_display[col].apply(
+                    lambda x: int(x) if pd.notna(x) else x
+                )
+
+    # Formatear números para mejor visualización
+    for col in filtered_players.columns:
+        if col in ["xG", "xA", "xAG", "npxG", "npxG+xA"]:
+            filtered_players[col] = filtered_players[col].apply(
+                lambda x: round(float(x), 2) if isinstance(x, (int, float)) else x
+            )
+
     # Mostrar tabla solo con las columnas seleccionadas y existentes
     st.dataframe(
         filtered_players[display_columns].style.background_gradient(
@@ -307,22 +334,29 @@ st.markdown("""
 # Sidebar con navegación al final
 
 with st.sidebar:
-    # Espacio flexible
-    st.markdown('<div style="flex-grow: 1;"></div>', unsafe_allow_html=True)
+    # Espacio flexible (empuja los botones hacia abajo)
+    st.markdown('<div style="flex: 1;"></div>', unsafe_allow_html=True)
     
-    # Botones al final
-    container = st.container()
-    with container:
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Back"):
-                if len(st.session_state.page_history) > 1:                    
-                    st.session_state.page_history.pop()
-                    previous_page = st.session_state.page_history[-1]
-                    st.switch_page(f"pages/{previous_page}")
-        with col2:
-            if st.button("Exit"):
-                logout()
+    # Corrección de orientación del texto en botones
+    st.markdown("""
+        <style>
+        .stButton button {
+            writing-mode: horizontal-tb !important;
+            text-align: center !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Botón Back
+    if st.button("Back", key="back_button", use_container_width=True):
+        if 'page_history' in st.session_state and len(st.session_state.page_history) > 1:
+            st.session_state.page_history.pop()
+            previous_page = st.session_state.page_history[-1]
+            st.switch_page(f"pages/{previous_page}")
+    
+    # Botón Exit
+    if st.button("Exit", key="exit_button", use_container_width=True):
+        logout()
 
     # CSS para posicionar los botones
     st.markdown("""
