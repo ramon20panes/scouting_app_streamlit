@@ -76,7 +76,7 @@ def create_bumpy_chart(df, highlight_teams=None):
     df_plot = df_filtered.set_index('Equipo').T
 
     # Invertir las posiciones para que 1 esté arriba y 20 abajo
-    df_plot = df_plot.applymap(lambda x: 21 - x)  
+    df_plot = df_plot.map(lambda x: 21 - x)  
     
     # Crear las etiquetas de jornadas
     Jornada_labels = ['Jornada ' + str(num) for num in range(1, len(df_plot)+1)]

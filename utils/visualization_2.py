@@ -626,10 +626,18 @@ def preprocess_xg_data(df_input):
     # Seleccionamos las columnas del primer apartado llamado 'ACT', 'GCA' en inglés
     df_processed = df_input.drop(columns=[x for x in df_input.columns if 'ACT' in x[0]])
 
-    df_processed.columns = df_processed.columns.droplevel(0)
+    # Eliminar nivel superior si hay MultiIndex
+    if isinstance(df_processed.columns, pd.MultiIndex):
+        df_processed.columns = df_processed.columns.droplevel(0)
 
-    # Filtramos las columnas que queremos
-    df_processed = df_processed[['Equipo', 'Jugador', 'Minute', 'xG', 'Resultado']]
+    # Verificar que las columnas necesarias existen
+    required_cols = ['Equipo', 'Jugador', 'Minute', 'xG', 'Resultado']
+    missing_cols = [col for col in required_cols if col not in df_processed.columns]
+    if missing_cols:
+        raise ValueError(f"Faltan columnas necesarias en el DataFrame: {missing_cols}")
+
+    # Filtrar las columnas necesarias
+    df_processed = df_processed[required_cols]
 
     # Se crea una columna del acumulado
     df_processed['cumulative_xG'] = df_processed.groupby('Equipo')['xG'].cumsum()

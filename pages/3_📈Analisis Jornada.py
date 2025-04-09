@@ -210,15 +210,9 @@ def main():
         
         if not local_row.empty:
             local_info = local_row.iloc[0].to_dict()
-            # Corregir la clave para ruta_escudo si tiene espacios extra
-            if ' ruta_escudo' in local_info:
-                local_info['ruta_escudo'] = local_info[' ruta_escudo'].strip("'")
-            
+
         if not visitante_row.empty:
             visitante_info = visitante_row.iloc[0].to_dict()
-            # Corregir la clave para ruta_escudo si tiene espacios extra
-            if ' ruta_escudo' in visitante_info:
-                visitante_info['ruta_escudo'] = visitante_info[' ruta_escudo'].strip("'")
                 
         # Cargar estadísticas del partido
         partido_str = f"{equipo_local}-{equipo_visitante}"
@@ -322,6 +316,7 @@ def main():
                 st.pyplot(fig)
         
             except Exception as e:
+                import traceback
                 st.error(f"Error al generar red de pases: {str(e)}")
                 st.write(traceback.format_exc())
 
@@ -408,10 +403,12 @@ def main():
                         st.warning("No hay ID de Understat disponible para este partido")
         
                 except Exception as e:
+                    import traceback
                     st.error(f"Error al cargar mapas de tiros: {str(e)}")
                     st.code(traceback.format_exc())
 
     except Exception as e:
+        import traceback
         st.error(f"Error general en la aplicación: {str(e)}")
         if 'traceback' in globals():
             st.code(traceback.format_exc())

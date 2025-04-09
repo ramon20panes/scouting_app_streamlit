@@ -48,7 +48,7 @@ def load_match_stats(match_id=None, jornada=None, partido=None):
     
     # Cargar el CSV
     try:
-        df = pd.read_csv(file_path, dtype=str)
+        df = pd.read_csv(file_path, dtype=str, skipinitialspace=True)
 
         # Identificar columnas numéricas conocidas
         numeric_columns = ['Jornada', 'Goles', 'Tiros a Puerta', 'Tiros Fuera', 'Tiros Totales', 
@@ -448,9 +448,9 @@ def process_whoscored_event_data(events_file, players_file, teams_file):
         print(f"Equipos en nombre de archivo: {file_home_team}-{file_away_team}")
     
     # Cargar DataFrames
-    df_red = pd.read_csv(events_file)
-    dfp_red = pd.read_csv(players_file)
-    dft_red = pd.read_csv(teams_file, sep=';')
+    df_red = pd.read_csv(events_file, skipinitialspace=True)
+    dfp_red = pd.read_csv(players_file, skipinitialspace=True)
+    dft_red = pd.read_csv(teams_file, sep=';', skipinitialspace=True)
     
     # Mapeo de IDs de equipos a nombres
     team_id_to_name = dict(zip(dft_red['id_whoscored'], dft_red['nombre']))
