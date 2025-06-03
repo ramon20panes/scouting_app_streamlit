@@ -132,11 +132,11 @@ else:
     
     with filter_col2:
         # Slider de minutos para la tabla
-        max_minutes = int(player_data['Minutos'].max()) if not player_data.empty else 3000
+        max_minutes = int(player_data['Minutos'].max()) if not player_data.empty else 3420
         min_minutes, max_minutes_selected = st.slider(
             "Rango minutos",
             min_value=0,
-            max_value=max_minutes,
+            max_value=3420,         # max_minutes,
             value=(0, max_minutes)
         )
     
@@ -219,7 +219,7 @@ else:
         rank_min, rank_max = st.slider(
             "Rango minutos",
             min_value=0,
-            max_value=max_minutes,
+            max_value=3420,  # max_minutes,
             value=(100, max_minutes)  # Por defecto filtramos jugadores con menos de 100 minutos
         )
     

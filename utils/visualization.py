@@ -104,7 +104,7 @@ def create_bumpy_chart(df, highlight_teams=None):
         figsize=(8, 4),  
         y_label='Posición',
         x_label='Jornadas',
-        ylim=(20.5, 0.5),
+        ylim=(21.0, 0.0),
         lw=2
     )
     # Cambiar el color de la etiqueta 'Posición' a darkblue
@@ -383,9 +383,9 @@ def create_match_timeline(df_tm, team_mapping):
     ax.set_yticklabels(['0', '1', '3'])  # Etiquetas vacías para quitar los números
     ax.tick_params(axis='y', colors='darkblue', size=0)
 
-    # Ajustar eje X para mostrar solo jornadas del 1 al 25
-    ax.set_xticks(range(1, 33))
-    ax.set_xticklabels(range(1, 33), color='darkblue', size=8, weight='bold') 
+    # Ajustar eje X para mostrar solo jornadas del 1 al 39
+    ax.set_xticks(range(1, 39))
+    ax.set_xticklabels(range(1, 39), color='darkblue', size=8, weight='bold') 
     ax.tick_params(axis='x', colors='darkblue', size=0)
 
     # Título personalizado
