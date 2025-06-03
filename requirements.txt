@@ -35,3 +35,4 @@ openpyxl==3.1.2  # Para leer Excel
 
 # Añadir para actualizar en streamlit.cloud
 setuptools>=65.0.0
+ipython>=8.0.0
